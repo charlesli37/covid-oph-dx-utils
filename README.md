@@ -10,11 +10,11 @@ _Charles Li, Flora Lum, Evan M. Chen, Philip A. Collender, Jennifer R. Head, Rah
 
 This project consists of the following main stages:
 
-![common-analytical-framework](main-figures/figure-1.pdf)
+![common-analytical-framework](main-figures/figure-1.jpg)
 
 ### Step 1A. 
 
-Establish an inventory of conditions ("diagnosis entities") to include for analysis via the `codebooks/source materials/CCSR ICD10 5.4.20_modified.xlsx` spreadsheet file, which is adapted from [v2020.2](https://www.hcup-us.ahrq.gov/toolssoftware/ccsr/v2020_2.zip) of the [Clinicial Classifiactions Software Refined (CCSR) database](https://www.hcup-us.ahrq.gov/toolssoftware/ccsr/ccs_refined.jsp#overdiagnoses), developed by the U.S. Agency for Healthcare Research and Quality. The CCSR aggregates tens of thousands of International Classification of Diseases, Tenth Revision, Clinical Modification (ICD-10-CM) codes into ["clinically meaningful categories"](https://www.hcup-us.ahrq.gov/toolssoftware/ccsr/DXCCSR-User-Guide-v2023-1.pdf),  which are hereafter referred to as "diagnosis entities". Only the "EYE" chapter of the CCSR, which encompasses ICD-10-CM codes related to diseases of the eye and adnexa, was utilized for this study. 
+Establish an inventory of conditions ("diagnosis entities") to include for analysis via the spreadsheet file `codebooks/source materials/CCSR ICD10 5.4.20_modified.xlsx`, which is adapted from [v2020.2](https://www.hcup-us.ahrq.gov/toolssoftware/ccsr/v2020_2.zip) of the [Clinicial Classifiactions Software Refined (CCSR) database](https://www.hcup-us.ahrq.gov/toolssoftware/ccsr/ccs_refined.jsp#overdiagnoses), developed by the U.S. Agency for Healthcare Research and Quality. The CCSR aggregates tens of thousands of International Classification of Diseases, Tenth Revision, Clinical Modification (ICD-10-CM) codes into ["clinically meaningful categories"](https://www.hcup-us.ahrq.gov/toolssoftware/ccsr/DXCCSR-User-Guide-v2023-1.pdf), hereafter referred to as "diagnosis entities". Only the "EYE" chapter of the CCSR, which encompasses ICD-10-CM codes related to diseases of the eye and adnexa, was utilized for this study. 
 
 `CCSR ICD10 5.4.20_modified.xlsx` contains two sheets (in separate tabs). The first sheet  every line corresponds to an ICD code, and the `DiagnosisEntity` column contains the name of the diagnosis entity that each ICD code is being classifed under (the diagnosis category is represented in the `CCSR Category` column). If an ICD code is to be excluded, write `CODE EXCLUDED` in the `DiagnosisEntity` column. 
 
