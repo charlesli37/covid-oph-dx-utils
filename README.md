@@ -1,7 +1,7 @@
 # Elasticities of Care Utilization Patterns During the COVID-19 Pandemic: A High-Dimensional Study of Presentations for Ophthalmic Conditions in the United States
 _Charles Li, Flora Lum, Evan M. Chen, Philip A. Collender, Jennifer R. Head, Rahul N. Khurana, Emmett T. Cunningham Jr., Ramana S. Moorthy, David W. Parke II, Stephen D. McLeod_
 
-*Last updated:* **February 23, 2023** by Charles Li (cli@aao.org), including data up to **December 31, 2021**
+*Last updated:* **March XX, 2023** by Charles Li (cli@aao.org), including data up to **December 31, 2021**
 
 ## About
 
@@ -12,26 +12,28 @@ This project consists of the following main stages:
 
 ![common-analytical-framework](main-figures/figure-1.jpg)
 
-### Step 1A. 
+### Step 1A. Construct an inventory of ophthalmic diagnoses to study
 
-Establish an inventory of conditions ("diagnosis entities") to include for analysis via the spreadsheet file `codebooks/source materials/CCSR ICD10 5.4.20_modified.xlsx`, which is adapted from [v2020.2](https://www.hcup-us.ahrq.gov/toolssoftware/ccsr/v2020_2.zip) of the [Clinicial Classifiactions Software Refined (CCSR) database](https://www.hcup-us.ahrq.gov/toolssoftware/ccsr/ccs_refined.jsp#overdiagnoses), developed by the U.S. Agency for Healthcare Research and Quality. The CCSR aggregates tens of thousands of International Classification of Diseases, Tenth Revision, Clinical Modification (ICD-10-CM) codes into ["clinically meaningful categories"](https://www.hcup-us.ahrq.gov/toolssoftware/ccsr/DXCCSR-User-Guide-v2023-1.pdf), hereafter referred to as "diagnosis entities". Only the "EYE" chapter of the CCSR, which encompasses ICD-10-CM codes related to diseases of the eye and adnexa, was utilized for this study. 
+1. An inventory of conditions ("diagnosis entities") to include for analysis was delineated using the spreadsheet file `codebooks/source materials/CCSR ICD10 5.4.20_modified.xlsx`, adapted from [v2020.2](https://www.hcup-us.ahrq.gov/toolssoftware/ccsr/v2020_2.zip) of the U.S. Agency for Healthcare Research and Quality [Clinicial Classifications Software Refined (CCSR) database](https://www.hcup-us.ahrq.gov/toolssoftware/ccsr/ccs_refined.jsp#overdiagnoses). The CCSR aggregates tens of thousands of International Classification of Diseases, Tenth Revision, Clinical Modification (ICD-10-CM) codes into [clinically meaningful groupings](https://www.hcup-us.ahrq.gov/toolssoftware/ccsr/DXCCSR-User-Guide-v2023-1.pdf), which are called "diagnosis entities" in this study. Only the "EYE" chapter of the CCSR, which encompasses ICD-10-CM codes related to diseases of the eye and adnexa, was considered for this analysis. 
 
-`CCSR ICD10 5.4.20_modified.xlsx` contains two sheets (in separate tabs). The first sheet  every line corresponds to an ICD code, and the `DiagnosisEntity` column contains the name of the diagnosis entity that each ICD code is being classifed under (the diagnosis category is represented in the `CCSR Category` column). If an ICD code is to be excluded, write `CODE EXCLUDED` in the `DiagnosisEntity` column. 
+    `CCSR ICD10 5.4.20_modified.xlsx` contains two tabs: the first tab is a spreadsheet that maps each ICD-10-CM diagnosis code (`ICD-10 Code`) to a diagnosis entity (`DiagnosisEntity`). Each distinct ICD-10-CM code is listed once (on a single row), with the ICD-10-CM description of the diagnosis code (`Diagnosis`), the diagnosis entity that the ICD-10-CM code belongs to (`DiagnosisEntity`), and the broader diagnosis category that the diagnosis entity belongs to (`CCSR Category`), in abbreviation form (EYE0XX), listed across the columns of the spreadsheet. Unlike the original CCSR mapping, which allowed for some ICD-10-CM codes to be cross-classified into more than one category, we adopted a mutually exclusive categorization scheme by assigning each diagnosis entity to one of 13 diagnosis categories (EYE001 - EYE013). Furthermore, an ICD-10-CM diagnosis code with incomplete time series (TS) data of monthly counts of patients observed with that condition and/or very low monthly case counts was excluded from consideration in this study if it was not feasible to assign the code into an existing or new (standalone) diagnosis entity in a clinically meaningful way. For ICD-10-CM codes that are not assigned to any diagnosis entity, `CODE EXCLUDED` was written in the `DiagnosisEntity` column. **Text SX** of the [Supplementary Information]() contains further details on the assignment of ICD-10-CM codes to diagnosis entities and other adaptations made from the original groupings provided by the CCSR database.
 
-The second sheet 
+    The second tab includes a list the full names of the diagnosis categories and their abbreviations (EYE0XX).
 
-For ease of import into R, both sheets of the .xlsx file were saved as separate CSV files:
+    For ease of import into R, both sheets of the Excel file were separately converted into CSV format:
+    > **Outputs**: \
+     `codebooks/source materials/CCSR ICD10 dx_entities 5.4.20_modified.csv`\
+     `codebooks/source materials/CCSR ICD10 categories 5.4.20_modified.csv`
 
-`codebooks/source materials/CCSR ICD10 dx_entities 5.4.20_modified.csv`\
-`codebooks/source materials/CCSR ICD10 categories 5.4.20_modified.csv`
+2. Next, the R script `codebooks/source materials/ccsr_codebook_qc_wrangling.Rmd` was run to produce a clean mapping of ICD-10-CM codes and diagnosis entities that can be imported into a relational database as a lookup table that facilitates the querying of monthly case numbers for each diagnosis entity. Data pre-processing steps and quality control checks were run to remove ICD-10-CM codes designated for exclusion, make formatting changes to ICD-10-CM codes to ensure compatability with database queries, and verify that each diagnosis entity is assigned to exactly one diagnosis category. 
 
-2. `codebooks/diagnoses/ccsr_codebook_qc_wrangling.Rmd` to produce a codebook that can be imported into Redshift, and to ensure the integrity of the diagnosis entities defined; STEPS: remove all excluded ICD's, add proper formatting to the `ICD-10 Code` column, and ensure that there is a 1:1 mapping between diagnosis entities and diagnosis categories (i.e., a diagnosis entity can only be assigned to one EYE0XX diagnosis category)
+    > **Inputs**:\
+      `codebooks/source materials/CCSR ICD10 dx_entities 5.4.20_modified.csv`\
+      `codebooks/source materials/CCSR ICD10 categories 5.4.20_modified.csv`  
+      **Output**:\
+      `codebooks/diagnoses/ccsr_codebook_for_sql.csv`
 
-    INPUT:\
-        `codebooks/diagnoses/CCSR ICD10 5.4.20_CLedits_01242021.csv`\
-        `codebooks/diagnoses/CCSR categories 5.4.20_CLedits_01102021.csv`\
-    OUTPUT:\
-        `codebooks/diagnoses/ccsr_codebook_for_sql.csv`\
+### Step 1B. Extract monthly counts of patients observed with each diagnosis
 
 3. `covid19_alldx_pull.sql` to pull the monthly case numbers of all diagnosis entities queried
     

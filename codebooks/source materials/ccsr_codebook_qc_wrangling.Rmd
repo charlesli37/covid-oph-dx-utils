@@ -1,0 +1,34 @@
+---
+title: "Diagnosis Codebook Quality Check and Prep for Querying"
+output: html_notebook
+---
+
+```{r}
+library(dplyr)
+```
+
+```{r}
+ccsr_cb <- read.csv('codebooks/source materials/CCSR ICD10 dx_entities 5.4.20_modified.csv')
+ccsr_cats <- read.csv('codebooks/source materials/CCSR ICD10 categories 5.4.20_modified.csv')
+```
+
+```{r}
+ccsr_cb <- ccsr_cb[ccsr_cb$DiagnosisEntity != 'CODE EXCLUDED', ] #remove excluded ICDs
+ccsr_cb <- ccsr_cb[!apply(ccsr_cb == "", 1, all), ] #remove blank rows
+ccsr_cb$ICD.10.Code <- paste0(substr(ccsr_cb$ICD.10.Code, 1, 3), ".", substr(ccsr_cb$ICD.10.Code, 4, nchar(ccsr_cb$ICD.10.Code))) #add proper formatting to ICD-10 codes for querying later
+```
+
+```{r}
+length(unique(ccsr_cb$DiagnosisEntity)) #336 unique diagnosis entities
+```
+
+```{r}
+cat_de_sum <- as.data.frame(unique(ccsr_cb[, c("DiagnosisEntity", "CCSR.Category")])) #336 rows - 1:1 correspondence OK
+cat_de_sum %>% 
+  count(DiagnosisEntity) %>%
+  filter(n > 1) # 0 rows - OK
+```
+
+```{r}
+write.csv(ccsr_cb[, -7], 'codebooks/ccsr_codebook_for_sql.csv', row.names = FALSE)
+```
