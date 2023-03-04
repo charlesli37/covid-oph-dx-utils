@@ -1,0 +1,87 @@
+TYPE,CATEGORY,ITEM,MEDIAN_WEIGHT,MAPPED,MAPPED_ENTITY_NAME
+anterior segment,conjunctivitis ,noninfectious,1,1,conjunctivitis - noninfectious
+anterior segment,keratitis,superficial punctate keratitis,1,1,superficial punctate keratitis
+anterior segment,contact lens,"mechanical complication (dislocation, vacuum, etc.)",1,0,
+anterior segment,pterygia,inflamed pterygia,1,1,pterygium
+anterior segment,conjunctivitis ,viral conjunctivitis ,2,1,conjunctivitis - infectious
+anterior segment,scleral/episcleral inflammation,episcleritis (regardless of the cause),2,1,episcleritis 
+anterior segment,corneal ulcer (not infected),"unperforated, isolated epithelial defect",2,1,"corneal ulcer - unperforated, iso epi defect"
+anterior segment,conjunctivitis ,bacterial conjunctivitis ,2,1,conjunctivitis - infectious
+anterior segment,keratitis,noninfectious interstitial keratitis,2,0,
+anterior segment,anterior acute uveitis,first episode (regardless of the cause),2,0,
+anterior segment,contact lens,infectious keratitis without severity factor,3,0,
+anterior segment,anterior acute uveitis,iterative (regardless of the cause),3,1,"anterior uveitis - acute, recurrent"
+anterior segment,scleral/episcleral inflammation,scleritis (regardless of the cause),3,1,scleritis
+anterior segment,lacrimal ducts,acute dacryocystitis,3,1,lacrimal passage infl - acute/unspec
+anterior segment,corneal ulcer (not infected),"unperforated, with stromal involvement",3,1,"corneal ulcer - unperforated, w/ str involv"
+anterior segment,keratitis,infectious keratitis,3,1,keratitis - infectious
+anterior segment,ocular surface burn,<9 clock hours of limbus and <75% of conjunctiva,3,1,"burn, corneal/conjunctival sac"
+anterior segment,contact lens,infectious keratitis with severity factor(s),4,0,
+anterior segment,glaucoma,acute angle-closure glaucoma,4,1,"glaucoma, PACG - acute"
+anterior segment,glaucoma,neovascular glaucoma,4,0,
+anterior segment,corneal ulcer (not infected),perforating ulcer,5,1,corneal ulcer - perforated
+posterior segment,nonspecific visual symptoms,ophthalmic migraine,1,0,
+posterior segment,nonspecific visual symptoms,vitreous floaters,1,1,other vitreous opacities
+posterior segment,choroidal new vessels (CNV) or direct complication,peripheral (exclusively),2,0,
+posterior segment,macula,macular edema,3,1,retinal edema
+posterior segment,chorioretinal toxoplasmosis (active phase),peripheral (exclusively),3,0,
+posterior segment,pupil disorders,no oculomotor disturbance,3,0,
+posterior segment,retinal peripheral tear,"no detached edges, no RD associated",3,1,retinal breaks or defects w/o RD
+posterior segment,chorioretinal toxoplasmosis (active phase),"vitreous hemorrhage, isolated/unidentified cause",3,0,
+posterior segment,acute binocular diplopia,without neurological symptoms,3,0,
+posterior segment,macula,macular hole,3,1,"macular cyst, hole, or pseudohole"
+posterior segment,optic neuritis (regardless of the cause),without neurological symptoms,3,0,
+posterior segment,retinal vein occlusion,branch (BRVO),3,1,BRVO
+posterior segment,retinal peripheral tear,"detached edges, no RD associated",3,1,retinal breaks or defects w/o RD
+posterior segment,posterior segment inflammation,vitritis (unidentified etiology),3,0,
+posterior segment,posterior segment inflammation,retinal vasculitis,4,1,retinal vasculitis
+posterior segment,retinal artery occlusion,branch (BRAO),4,1,BRAO
+posterior segment,choroidal new vessels (CNV) or direct complication,subfoveal,4,0,
+posterior segment,optic neuritis (regardless of the cause),with associated neurological symptoms,4,0,
+posterior segment,pupil disorders,associated with oculomotor disturbance,4,0,
+posterior segment,retinal vein occlusion,central (CRVO),4,1,CRVO
+posterior segment,ischemic optic neuropathy,isolated,4,1,ischemic optic neuropathy
+posterior segment,retinal detachment (RD),macula off,4,0,
+posterior segment,chorioretinal toxoplasmosis (active phase),foveal or peripapillary,4,0,
+posterior segment,retinal detachment (RD),macula on,5,0,
+posterior segment,acute binocular diplopia,with associated neurological symptoms,5,0,
+posterior segment,retinal artery occlusion,central (CRAO),5,1,CRAO
+traumatisms,conjunctiva,subconjunctival hemorrhage,1,1,conjunctival hemorrhage
+traumatisms,conjunctiva,conjunctival wound without scleral exposure,1,0,
+traumatisms,corneal injury,corneal foreign body away from the axis,2,0,
+traumatisms,other injuries,eyelid skin injury,2,1,eyelid/periocular superficial injury
+traumatisms,conjunctiva,conjunctival wound with scleral exposure,2,0,
+traumatisms,corneal injury,nonperforating laceration away from the axis,2,0,
+traumatisms,commotio retinae,peripheral posttraumatic retinopathy,2,0,
+traumatisms,corneal injury,corneal foreign body in the visual axis,3,0,
+traumatisms,blunt injuries with impaired vision,hyphema (isolated),3,1,hyphema
+traumatisms,other injuries,eyelid-margin injury,3,1,eyelid/periocular open wound
+traumatisms,other injuries,eyelid levator injury,3,0,
+traumatisms,corneal injury,nonperforating laceration in the visual axis,3,0,
+traumatisms,commotio retinae,posttraumatic maculopathy,3,0,
+traumatisms,blunt injuries with impaired vision,iridodialysis (avulsion of the iris root),3,1,iridodialysis
+traumatisms,other injuries,tear ducts injury,3,0,
+traumatisms,corneal injury,perforating but self-sealing laceration,4,0,
+traumatisms,blunt injuries with impaired vision,choroidal rupture,4,1,choroidal rupture
+traumatisms,blunt injuries with impaired vision,lens dislocation,4,1,lens dislocation
+traumatisms,penetrating eye injury,"without intraocular foreign body, eye not collapsed",4,0,
+traumatisms,corneal injury,perforating and leaking laceration,5,1,ocular laceration w/ prolapse
+traumatisms,penetrating eye injury,"with intraocular foreign body, eye not collapsed",5,1,orbit penetrating wound w/ FB
+traumatisms,blunt injuries with impaired vision,scleral rupture,5,1,ocular laceration w/ prolapse
+traumatisms,other injuries,optic nerve injury,5,1,optic nerve/pathway injury
+traumatisms,penetrating eye injury,"without intraocular foreign body, eye collapsed",5,0,
+traumatisms,penetrating eye injury,"with intraocular foreign body, eye collapsed",5,1,orbit penetrating wound w/ FB
+post-op complications,acute pain ,with normal postoperative course,2,1,acute postop pain NEC
+post-op complications,high intraocular pressure (except AACG),25 < IOP < 35 mmHg,2,0,
+post-op complications,suture-related complication,noninfectious suture-related complication,2,0,
+post-op complications,high intraocular pressure (except AACG),IOP ≥ 35 mmHg,3,0,
+post-op complications,LASIK,complication related to the flap,3,0,
+post-op complications,keratoplasty,suture-related complication (no infection),3,0,
+post-op complications,intraocular hemorrhage,within 3 days after the surgery,4,0,
+post-op complications,keratoplasty,acute rejection,4,1,corneal transplant rejection
+post-op complications,mechanical complication following surgery,reopening of the surgical wound,4,0,
+post-op complications,suture-related complication,infectious suture-related complication,4,0,
+post-op complications,mechanical complication following surgery,collapsed eyeball (athalamia),4,0,
+post-op complications,keratoplasty,graft dislocation,5,1,prosthetic/implant/graft displacement
+post-op complications,infection following surgery,blebitis,5,1,blebitis
+post-op complications,infection following surgery,panophthalmitis,5,1,panophthalmitis

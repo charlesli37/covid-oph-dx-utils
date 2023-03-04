@@ -1,0 +1,45 @@
+---
+title: "Wrangle data (exported from the database) for analysis"
+output: html_notebook
+---
+```{r}
+#load required libraries
+library(dplyr)
+library(lubridate)
+library(zoo)
+```
+
+```{r}
+master_dx_df <- read.csv('/data-extraction/covid_elasticity_all_dx_2017_2021_complete_20220519.csv')
+
+#reformat year-month as date variable
+master_dx_df$date <- paste0(master_dx_df$year, '-', master_dx_df$month)
+master_dx_df$date <- as.Date(as.yearmon(master_dx_df$date))
+master_dx_df <- master_dx_df[order(master_dx_df$date, master_dx_df$dx_name), ]
+
+#generate rates observed per 100k 
+master_dx_df$pct_rec <- (master_dx_df$num_dx_records/master_dx_df$tot_num_dx_records)*1000000
+master_dx_df$pct_pts <- (master_dx_df$num_dx_patients/master_dx_df$tot_num_dx_patients)*100000
+```
+
+```{r}
+#generate Fourier terms
+master_dx_df <- mutate(master_dx_df, months_since_2017 = month + (year-2017)*12)
+
+master_dx_df$sin_3 <- sin(2*3.14159*master_dx_df$months_since_2017/3)
+master_dx_df$cos_3 <- cos(2*3.14159*master_dx_df$months_since_2017/3)
+master_dx_df$sin_6 <- sin(2*3.14159*master_dx_df$months_since_2017/6)
+master_dx_df$cos_6 <- cos(2*3.14159*master_dx_df$months_since_2017/6)
+master_dx_df$sin_12 <- sin(2*3.14159*master_dx_df$months_since_2017/12)
+master_dx_df$cos_12 <- cos(2*3.14159*master_dx_df$months_since_2017/12)
+```
+
+```{r}
+#remove any leading and trailing whitespaces from diagnosis entity names
+master_dx_df$dx_name <- stringr::str_trim(master_dx_df$dx_name)
+```
+
+```{r}
+##export dataset for further analysis in a separate R script
+write.csv(master_dx_df, '/data-extraction/dx_proportions_and_cnts.csv', row.names = F)
+```
