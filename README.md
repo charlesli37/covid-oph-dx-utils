@@ -50,18 +50,18 @@ Monthly numbers of patients documented with each diagnosis entity were queried f
 
 1. After exporting a single table containing monthly time series data of case counts for each diagnosis entity, some data pre-processing and wrangling steps were undertaken via the R script `data-extraction/covid_elasticity_dataset_prep.Rmd` to generate a single, clean dataset for further analysis. These steps include applying appropriate formatting to year-month date information, applying appropriate string formatting to ensure consistent representations of diagnosis entity names, and generating harmonic terms with 3, 6, and 12-month periodicities.
     
-> **Input**:\
- `data-extraction/covid_elasticity_all_dx_2017_2021_complete_20220519.csv`\
-  **Output**:\
- `data-extraction/dx_proportions_and_cnts.csv`
+    > **Input**:\
+    `data-extraction/covid_elasticity_all_dx_2017_2021_complete_20220519.csv`\
+    **Output**:\
+    `data-extraction/dx_proportions_and_cnts.csv`
 
 2. Finally, all steps undertaken for statistical modeling and data analysis (as described in Steps 2-4 in the summary graphic above) were implemented via the R script `modeling-analysis/covid-elasticity-static-figures.Rmd`.
 
-> **Inputs**:\
- `data-extraction/dx_proportions_and_cnts.csv`\
- `codebooks/ccsr_codebook_for_sql.csv`\
- `codebooks/source materials/CCSR ICD10 categories 5.4.20_modified.csv`\
- `codebooks/base_score_modified.csv`\ 
- `codebooks/VEHSS_VT_crosswalk.csv`\ 
-  **Outputs**:\
- `main-figures/`
+    > **Inputs**:\
+    `data-extraction/dx_proportions_and_cnts.csv`\
+    `codebooks/ccsr_codebook_for_sql.csv`\
+    `codebooks/source materials/CCSR ICD10 categories 5.4.20_modified.csv`\
+    `codebooks/base_score_modified.csv`\ 
+    `codebooks/VEHSS_VT_crosswalk.csv`\ 
+    **Outputs**:\
+    `main-figures/`
