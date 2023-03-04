@@ -55,8 +55,6 @@ Monthly numbers of patients documented with each diagnosis entity were queried f
   **Output**:\
  `data-extraction/dx_proportions_and_cnts.csv`
 
-OPTIONAL STEP: to generate summary stats for the monthly volume of each diagnosis entity, run `codebooks/diagnoses/dxentities_eda.Rmd` with the same INPUT file. OUTPUT: `codebooks/diagnoses/dx_entities_EDA_summary.csv`
-
 2. Finally, all steps undertaken for statistical modeling and data analysis (as described in Steps 2-4 in the summary graphic above) were implemented via the R script `modeling-analysis/covid-elasticity-static-figures.Rmd`.
 
 > **Inputs**:\
