@@ -1,7 +1,7 @@
 ---
 title: "Static Figures for the COVID Elasticity Paper"
 author: "Charles Li"
-date: "June 7, 2022"
+date: "March 4, 2022"
 output: html_notebook
 ---
 
@@ -37,29 +37,33 @@ options(scipen=10000)
 
 # Initialization
 
+```{r setup, include=FALSE, echo=FALSE}
+require("knitr")
+opts_knit$set(root.dir = "/Users/charlesli/Library/CloudStorage/OneDrive-AmericanAcademyofOphthalmology/covid-elasticity-oph")
+```
+
 ## Data import
 ```{r}
 #### datasets
-master_dx_df <- as.data.frame(read.csv('/Users/charlesli/OneDrive - American Academy of Ophthalmology/covid-elasticity-paper/shiny-app/dx_proportions_and_cnts.csv'))
+master_dx_df <- as.data.frame(read.csv('data-extraction/dx_proportions_and_cnts.csv'))
 master_dx_df$Y <- master_dx_df$num_dx_patients
 
 #### codebooks 
-icd_df <- as.data.frame(read.csv('/Users/charlesli/OneDrive - American Academy of Ophthalmology/covid-elasticity-paper/shiny-app/ccsr_codebook_for_sql.csv'))
+icd_df <- as.data.frame(read.csv('codebooks/ccsr_codebook_for_sql.csv'))
 icd_df$Diagnosis.Name <- stringr::str_trim(icd_df$DiagnosisEntity)
-ccsr_cats <- read.csv('/Users/charlesli/OneDrive - American Academy of Ophthalmology/covid-elasticity-paper/shiny-app/CCSR categories 5.4.20_CLedits_01102021.csv', header = F)
+ccsr_cats <- read.csv('codebooks/source materials/CCSR ICD10 categories 5.4.20_modified.csv', header = F)
 icd_df <- merge(icd_df, ccsr_cats, by.x = 'CCSR.Category', by.y = 'V1')
 icd_df$Category <- icd_df$V2
 icd_df$DiagnosisEntity <- stringr::str_trim(icd_df$DiagnosisEntity)
 
-severity_idx <- as.data.frame(read.csv('/Users/charlesli/OneDrive - American Academy of Ophthalmology/covid-elasticity-paper/shiny-app/base_score_modified_FLCLECedits_02162021.csv'))
+severity_idx <- as.data.frame(read.csv('codebooks/base_score_modified.csv'))
 severity_idx <- severity_idx[severity_idx$MAPPED == 1, ]
 severity_idx$MAPPED_ENTITY_NAME <- stringr::str_trim(severity_idx$MAPPED_ENTITY_NAME)
 severity_idx <- unique(severity_idx)
 
-vehss_idx <- read.csv('/Users/charlesli/OneDrive - American Academy of Ophthalmology/covid-elasticity-paper/shiny-app/VEHSS_VT_crosswalk.csv')
+vehss_idx <- read.csv('codebooks/VT_vs_NVT_Big4_crosswalk.csv')
 vehss_idx$DiagnosisEntity <- stringr::str_trim(vehss_idx$DiagnosisEntity)
 ```
-
 
 ## Elasticity function
 ```{r}

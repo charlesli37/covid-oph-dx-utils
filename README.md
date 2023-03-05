@@ -61,7 +61,7 @@ Monthly numbers of patients documented with each diagnosis entity were queried f
     `data-extraction/dx_proportions_and_cnts.csv`\
     `codebooks/ccsr_codebook_for_sql.csv`\
     `codebooks/source materials/CCSR ICD10 categories 5.4.20_modified.csv`\
-    `codebooks/base_score_modified.csv`\ 
-    `codebooks/VEHSS_VT_crosswalk.csv`\ 
+    `codebooks/base_score_modified.csv` (mapping of diagnosis entities in this study to the ocular emergencies surveyed in the [BAsic SEverity Score for Common OculaR Emergencies (BaSe SCOrE) study](https://pubmed.ncbi.nlm.nih.gov/26294965/) by Bourges et al.)\
+    `codebooks/VT_vs_NVT_Big4_crosswalk.csv` (classification of diagnosis entities related to diabetic retinopathy, age-related macular degeneration, and glaucoma as vision-threatening vs. not vision-threatening)
     **Outputs**:\
     `main-figures/`
