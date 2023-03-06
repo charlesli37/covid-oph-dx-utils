@@ -490,31 +490,17 @@ df_models <- merge(df_models, master_dx_df_sum, by.x = "Diagnosis Name", by.y = 
 ```
 
 ```{r}
-write.csv(df_models, '/Users/charlesli/OneDrive - American Academy of Ophthalmology/covid-elasticity-paper/outputs/06072022/dx-models.csv')
+write.csv(df_models, 'modeling-analysis/dx-entity-models-summstats.csv')
 ```
 
 ## Filter out diagnosis entities with poor model performance
 ```{r}
 #drop based on PE metric (RMSPE <= 0.125)
 accurate_dx_list <- df_models[df_models$RMSPE <= 0.125, 'Diagnosis Name']
-
-#drop based on more strict PE metric (RMSPE <= 0.10)
-accurate_dx_list2 <- df_models[df_models$RMSPE <= 0.10, 'Diagnosis Name']
 ```
 
-```{r}
-write.csv(accurate_dx_list, '/Users/charlesli/OneDrive - American Academy of Ophthalmology/covid-elasticity-paper/outputs/06072022/accurate-dx-list.csv')
-```
-
-```{r}
-#for the supplement
-write.csv(severity_idx[severity_idx$MAPPED_ENTITY_NAME %in% accurate_dx_list, ], '/Users/charlesli/OneDrive - American Academy of Ophthalmology/covid-elasticity-paper/outputs/06072022/bourgesocularemerg-final.csv')
-write.csv(vehss_idx[vehss_idx$DiagnosisEntity %in% accurate_dx_list, ], '/Users/charlesli/OneDrive - American Academy of Ophthalmology/covid-elasticity-paper/outputs/06072022/vehssbig4-final.csv')
-```
-
-## Diagnosis codebook for MS
-For manuscript supplement - export inventory of all diagnosis entities:
-Do it category-by-category due to space considerations
+## Diagnosis entity codebook for supplement
+For the manuscript supplement (PDF version, Table S1) - export a mapping of ICD-10-CM codes corresponding to all 336 diagnosis entities as Word documents (separate Word doc for each diagnosis category due to memory constraints)
 
 ```{r}
 categoryList <- sort(unique(icd_df$Category))
@@ -525,13 +511,14 @@ for (i in 1:length(categoryList)){
   colnames(icd_df_exp) <- c("Diagnosis Category", "Diagnosis Entity", "ICD-10 Code", "ICD-10 Description")
   icd_df_exp <- icd_df_exp[order(icd_df_exp$`Diagnosis Category`, icd_df_exp$`Diagnosis Entity`, icd_df_exp$`ICD-10 Code`), ]
   icd_df_exp$Included <- ifelse(icd_df_exp$`Diagnosis Entity` %in%  accurate_dx_list, 1, 0)
-  icd_ft <- theme_box(flextable(icd_df_exp))
-  icd_ft2 <- merge_v(icd_ft, j = c('Diagnosis Entity', 'Diagnosis Category'))
+  icd_df_exp$dummy_v <- paste0(icd_df_exp$`Diagnosis Entity`, icd_df_exp$Included)
+  icd_ft <- theme_box(flextable(icd_df_exp, col_keys = c('Diagnosis Category', 'Diagnosis Entity', 'ICD-10 Code', 'ICD-10 Description', 'Included')))
+  icd_ft2 <- merge_v(icd_ft, j = c('Diagnosis Entity', 'Diagnosis Category', 'dummy_v'), target = c('Diagnosis Entity', 'Diagnosis Category', 'Included'))
   icd_ft_final <- valign(icd_ft2, j = 'Diagnosis Category', valign = 'top')
   
   read_docx() %>%
     body_add_flextable(value = icd_ft_final) %>%
-    print(target = paste0("/Users/charlesli/OneDrive - American Academy of Ophthalmology/covid-elasticity-paper/outputs/06072022/icd-codebook-JAMA-", i, ".docx"))
+    print(target = paste0("modeling-analysis/dx-entity-codebook-export/icd-codebook-suppl-", i, ".docx"))
   
 }
 ```
@@ -560,10 +547,6 @@ obj3_mat2 <- as.data.frame(obj3_mat * obj3_p_mat_bin)
 master_devs <- obj3_mat2[rownames(obj3_mat2) %in% accurate_dx_list, ]
 ```
 
-```{r}
-write.csv(master_devs, '/Users/charlesli/OneDrive - American Academy of Ophthalmology/covid-elasticity-paper/outputs/06072022/master-deviations.csv')
-```
-
 ### Deviances (RAW, i.e., retaining original value of non-sigs)
 ```{r}
 #keep only diagnoses with accurate enough RMSPEs
@@ -571,7 +554,7 @@ master_devsOrig <- as.data.frame(obj3_mat[rownames(obj3_mat) %in% accurate_dx_li
 ```
 
 ```{r}
-write.csv(master_devsOrig, '/Users/charlesli/OneDrive - American Academy of Ophthalmology/covid-elasticity-paper/outputs/06072022/master-deviations-raw.csv')
+write.csv(master_devsOrig, 'modeling-analysis/dx-entity-deviations.csv')
 ```
 
 ### 95% CIs
@@ -587,7 +570,7 @@ master_dev_bounds <- as.data.frame(obj3_mat_dev[rownames(obj3_mat_dev) %in% accu
 ```
 
 ```{r}
-write.csv(master_dev_bounds, '/Users/charlesli/OneDrive - American Academy of Ophthalmology/covid-elasticity-paper/outputs/06072022/master-deviation-bounds.csv')
+write.csv(master_dev_bounds, 'modeling-analysis/dx-entity-deviation-bounds.csv')
 ```
 
 ### P-values
@@ -603,7 +586,7 @@ master_pvalues <- as.data.frame(obj3_mat_pval[rownames(obj3_mat_pval) %in% accur
 ```
 
 ```{r}
-write.csv(master_pvalues, '/Users/charlesli/OneDrive - American Academy of Ophthalmology/covid-elasticity-paper/outputs/06072022/master-pvalues.csv')
+write.csv(master_pvalues, 'modeling-analysis/dx-entity-deviation-pvalues.csv')
 ```
 
 ### Weighted deviances for heatmap shading
@@ -625,7 +608,7 @@ master_summarystats <- obj2_df_summstats[obj2_df_summstats$entity_name %in% accu
 ```
 
 ```{r}
-write.csv(master_summarystats, '/Users/charlesli/OneDrive - American Academy of Ophthalmology/covid-elasticity-paper/outputs/06072022/master-summarystats.csv')
+write.csv(master_summarystats, 'modeling-analysis/dx-entity-quarterly-deviations.csv')
 ```
 
 ```{r}
@@ -641,10 +624,6 @@ dx_legend_df <- dx_legend_df[order(dx_legend_df$catCode), c("catCode", "Category
 colnames(dx_legend_df) <- c("Code", "Category Name")
 dx_legend_df$short_name <- c("Blind", "Cataract", "Cornea/External", "Glaucoma", "Neuro", "Oculoplastics", "OGI", "Other", "PO", "Refra", "Retina/Vitreous", "Strab", "Uveitis")
 dx_legend_df
-```
-
-```{r}
-write.csv(dx_legend_df, '/Users/charlesli/OneDrive - American Academy of Ophthalmology/covid-elasticity-paper/outputs/06072022/master-heatmap-legend.csv', row.names = F)
 ```
 
 ```{r}
@@ -706,7 +685,7 @@ master_summarystats$mean_monthly_pts <- as.numeric(master_summarystats$mean_mont
 master_summarystats$median_monthly_pts <- as.numeric(master_summarystats$median_monthly_pts)
 ```
 
-# Main figures
+# Main figures (RE-RUN LEFT OFF HERE 6 MAR 2023 12:06AM)
 
 ## FIGURE 1
 
