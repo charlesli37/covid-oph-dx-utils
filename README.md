@@ -61,16 +61,17 @@ Monthly numbers of patients documented with each diagnosis entity were queried f
      * `data-extraction/dx_proportions_and_cnts.csv`
      * `codebooks/ccsr_codebook_for_sql.csv`
      * `codebooks/source materials/CCSR ICD10 categories 5.4.20_modified.csv`
-     * `codebooks/base_score_modified.csv`: mapping of diagnosis entities in this study to the ocular emergencies surveyed in the [BAsic SEverity Score for Common OculaR Emergencies (BaSe SCOrE) study](https://pubmed.ncbi.nlm.nih.gov/26294965/) by Bourges et al. (**Table S3** of the [Supplementary Information]())
-     * `codebooks/VT_vs_NVT_Big4_crosswalk.csv`: classification of diagnosis entities related to diabetic retinopathy, age-related macular degeneration, and glaucoma as vision-threatening vs. not vision-threatening (**Table S4** of the [Supplementary Information]())
+     * `codebooks/base_score_modified.csv` mapping of diagnosis entities in this study to the ocular emergencies surveyed in the [BAsic SEverity Score for Common OculaR Emergencies (BaSe SCOrE) study](https://pubmed.ncbi.nlm.nih.gov/26294965/) by Bourges et al. (**Table S3** of the [Supplementary Information]())
+     * `codebooks/VT_vs_NVT_Big4_crosswalk.csv` classification of diagnosis entities related to diabetic retinopathy, age-related macular degeneration, and glaucoma as vision-threatening vs. not vision-threatening (**Table S4** of the [Supplementary Information]())
     <br/><br/>
     > **Outputs** (supplementary data):
-     * `modeling-analysis/dx-entity-models-summstats.csv`: summary statistics and counterfactual model performance metrics for all 336 diagnosis entities considered for inclusion in the analysis (**Table S2** of the [Supplementary Information]())
-     * `modeling-analysis/dx-entity-codebook-export`: folder containing Word document tables (one for each diagnosis category) of the mapping between ICD-10-CM codes and diagnosis entities (converted to PDF format for **Table S1** of the [Supplementary Information]())
-     * `modeling-analysis/dx-entity-deviations.csv`: estimated deviations from expected utilization levels for each month of the pandemic study period, for the 261 diagnosis entities included in the analysis (visualized in **Figure S7** of the [Supplementary Information]())
-     * `modeling-analysis/dx-entity-deviation-bounds.csv`: 95% confidence intervals for estimated deviations from expected utilization levels for each month of the pandemic study period, for the 261 diagnosis entities included in the analysis (**Table S8** of the [Supplementary Information]())
-     * `modeling-analysis/dx-entity-deviation-pvalues.csv`: P-values for estimated deviations from expected utilization levels for each month of the pandemic study period, for the 261 diagnosis entities included in the analysis (**Table S7** of the [Supplementary Information]())
-     * `modeling-analysis/dx-entity-quarterly-deviations.csv`: Summary statistics, 95% confidence intervals, and p-values for estimated deviations from expected utilization levels for each quarter of the pandemic study period, for the 261 diagnosis entities included in the analysis 
+     * `modeling-analysis/dx-entity-models-summstats.csv` summary statistics and counterfactual model performance metrics for all 336 diagnosis entities considered for inclusion in the analysis (**Table S2** of the [Supplementary Information]())
+     * `modeling-analysis/dx-entity-codebook-export` folder containing Word document tables (one for each diagnosis category) of the mapping between ICD-10-CM codes and diagnosis entities (converted to PDF format for **Table S1** of the [Supplementary Information]())
+     * `modeling-analysis/dx-entity-deviations.csv` estimated deviations from expected utilization levels for each month of the pandemic study period, for the 261 diagnosis entities included in the analysis (visualized in **Figure S7** of the [Supplementary Information]())
+     * `modeling-analysis/dx-entity-deviation-bounds.csv` 95% confidence intervals for estimated deviations from expected utilization levels for each month of the pandemic study period, for the 261 diagnosis entities included in the analysis (**Table S8** of the [Supplementary Information]())
+     * `modeling-analysis/dx-entity-deviation-pvalues.csv` p-values for estimated deviations from expected utilization levels for each month of the pandemic study period, for the 261 diagnosis entities included in the analysis (**Table S7** of the [Supplementary Information]())
+     * `modeling-analysis/dx-entity-quarterly-deviations.csv` summary statistics, 95% confidence intervals, and p-values for estimated deviations from expected utilization levels for each quarter of the pandemic study period, for the 261 diagnosis entities included in the analysis
+    <br/><br/> 
     > **Outputs** (main figures):
      * `main-figures/figure-2.pdf` (**Figure 2** of the [Manuscript]())
      * `main-figures/figure-3.pdf` (**Figure 3** of the [Manuscript]())
