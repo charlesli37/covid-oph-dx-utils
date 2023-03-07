@@ -1,33 +1,32 @@
-﻿DiagnosisEntity,VEHSSclass,Big4Category,Type
-PDR w/ DME,R2_VT,DR,VT
-PDR w/o DME,R2_VT,DR,VT
-"PDR, stable",R2_VT,DR,VT
-unspec DR w/ DME,R2_VT,DR,VT
-NPDR w/ DME,R2_VT,DR,VT
-DME resolved after tx,R2_VT,DR,VT
-unspec DR w/o DME,R2_NVT,DR,NVT
-NPDR w/o DME,R2_NVT,DR,NVT
-other diabetic ophthalmic compl,R2_NVT,DR,NVT
-"dry AMD, adv stage w/o subfov involv",R3_VT,AMD,VT
-"dry AMD, adv stage w/ subfov involv",R3_VT,AMD,VT
-"wet AMD, unspec stage",R3_VT,AMD,VT
-"wet AMD, active CNV",R3_VT,AMD,VT
-"wet AMD, inactive CNV",R3_VT,AMD,VT
-"wet AMD, inactive scar",R3_VT,AMD,VT
-unspec macular degeneration,R3_NVT,AMD,NVT
-drusen of macula,R3_NVT,AMD,NVT
-"dry AMD, unspec stage",R3_NVT,AMD,NVT
-"dry AMD, early stage",R3_NVT,AMD,NVT
-"dry AMD, intermediate stage",R3_NVT,AMD,NVT
-"glaucoma, OAG",R5_VT,Glaucoma,VT
-"glaucoma, PXG",R5_VT,Glaucoma,VT
-"glaucoma, PACG - other/unspec",R5_VT,Glaucoma,VT
-"glaucoma, PACG - acute",R5_VT,Glaucoma,VT
-"glaucoma, PACG - chronic ",R5_VT,Glaucoma,VT
-"glaucoma, secondary to eye trauma",R5_VT,Glaucoma,VT
-"glaucoma, secondary to eye infl",R5_VT,Glaucoma,VT
-"glaucoma, secondary to other eye dis",R5_VT,Glaucoma,VT
-"glaucoma, secondary to drugs",R5_VT,Glaucoma,VT
-"glaucoma, absolute",R5_VT,Glaucoma,VT
-"glaucoma, suspect",R5_NVT,Glaucoma,NVT
-"glaucoma, other/unspec",R5_NVT,Glaucoma,NVT
+﻿DiagnosisEntity,Big4Category,Type
+PDR w/ DME,DR,VT
+PDR w/o DME,DR,VT
+"PDR, stable",DR,NVT
+unspec DR w/ DME,DR,VT
+NPDR w/ DME,DR,VT
+DME resolved after tx,DR,NVT
+unspec DR w/o DME,DR,NVT
+NPDR w/o DME,DR,NVT
+other diabetic ophthalmic compl,DR,NVT
+"dry AMD, adv stage w/o subfov involv",AMD,VT
+"dry AMD, adv stage w/ subfov involv",AMD,VT
+"wet AMD, unspec stage",AMD,VT
+"wet AMD, active CNV",AMD,VT
+"wet AMD, inactive CNV",AMD,VT
+"wet AMD, inactive scar",AMD,VT
+unspec macular degeneration,AMD,NVT
+drusen of macula,AMD,NVT
+"dry AMD, unspec stage",AMD,NVT
+"dry AMD, early stage",AMD,NVT
+"dry AMD, intermediate stage",AMD,NVT
+"glaucoma, OAG",Glaucoma,NVT
+"glaucoma, PXG",Glaucoma,NVT
+"glaucoma, PACG - other/unspec",Glaucoma,VT
+"glaucoma, PACG - acute",Glaucoma,VT
+"glaucoma, PACG - chronic ",Glaucoma,VT
+"glaucoma, secondary to eye trauma",Glaucoma,VT
+"glaucoma, secondary to eye infl",Glaucoma,VT
+"glaucoma, secondary to other eye dis",Glaucoma,VT
+"glaucoma, secondary to drugs",Glaucoma,VT
+"glaucoma, absolute",Glaucoma,VT
+"glaucoma, suspect",Glaucoma,NVT

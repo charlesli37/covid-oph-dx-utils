@@ -2,7 +2,7 @@
 title: "Static Figures for the COVID Elasticity Paper"
 author: "Charles Li"
 date: "March 4, 2022"
-output: html_notebook
+output: 
 ---
 
 ```{r}
@@ -685,19 +685,19 @@ master_summarystats$mean_monthly_pts <- as.numeric(master_summarystats$mean_mont
 master_summarystats$median_monthly_pts <- as.numeric(master_summarystats$median_monthly_pts)
 ```
 
-# Main figures (RE-RUN LEFT OFF HERE 6 MAR 2023 12:06AM)
+# Main figures (aside from Figure 1)
 
-## FIGURE 1
+## FIGURE 2
 
-### 1A-1D: Time series of non-severe Big 4 eye conditions  
+### 2A-2D: Time series of non-severe Big 4 eye conditions  
 ```{r}
-eObjFig1a <- elasticities("dry AMD, early stage", master_dx_df)
-fig1a_df <- as.data.frame(eObjFig1a[[8]])
-fig1a_df$date <- as.Date(fig1a_df$date)
+eObjFig2a <- elasticities("dry AMD, early stage", master_dx_df)
+fig2a_df <- as.data.frame(eObjFig2a[[8]])
+fig2a_df$date <- as.Date(fig2a_df$date)
 ```
 
 ```{r}
-fig1a <- ggplot(fig1a_df) +
+fig2a <- ggplot(fig2a_df) +
   geom_line(aes(x = date, y = Y, col ='Observed')) +
   geom_line(aes(x = date, y = predicted, col = 'Predicted')) +
   geom_ribbon(aes(x = date, ymin = lowerPI, ymax = upperPI, fill = 'Predicted', color = 'Predicted'),  alpha = 0.15, show.legend = F) +
@@ -712,13 +712,13 @@ fig1a <- ggplot(fig1a_df) +
 ```
 
 ```{r}
-eObjFig1b <- elasticities("NPDR w/o DME", master_dx_df)
-fig1b_df <- as.data.frame(eObjFig1b[[8]])
-fig1b_df$date <- as.Date(fig1b_df$date)
+eObjFig2b <- elasticities("NPDR w/o DME", master_dx_df)
+fig2b_df <- as.data.frame(eObjFig2b[[8]])
+fig2b_df$date <- as.Date(fig2b_df$date)
 ```
 
 ```{r}
-fig1b <- ggplot(fig1b_df) +
+fig2b <- ggplot(fig2b_df) +
   geom_line(aes(x = date, y = Y, col ='Observed')) +
   geom_line(aes(x = date, y = predicted, col = 'Predicted')) +
   geom_ribbon(aes(x = date, ymin = lowerPI, ymax = upperPI, fill = 'Predicted', color = 'Predicted'),  alpha = 0.15, show.legend = F) +
@@ -733,13 +733,13 @@ fig1b <- ggplot(fig1b_df) +
 ```
 
 ```{r}
-eObjFig1c <- elasticities("cataract, age-related", master_dx_df)
-fig1c_df <- as.data.frame(eObjFig1c[[8]])
-fig1c_df$date <- as.Date(fig1c_df$date)
+eObjFig2c <- elasticities("cataract, age-related", master_dx_df)
+fig2c_df <- as.data.frame(eObjFig2c[[8]])
+fig2c_df$date <- as.Date(fig2c_df$date)
 ```
 
 ```{r}
-fig1c <- ggplot(fig1c_df) +
+fig2c <- ggplot(fig2c_df) +
   geom_line(aes(x = date, y = Y, col ='Observed')) +
   geom_line(aes(x = date, y = predicted, col = 'Predicted')) +
   geom_ribbon(aes(x = date, ymin = lowerPI, ymax = upperPI, fill = 'Predicted', color = 'Predicted'),  alpha = 0.15, show.legend = F) +
@@ -754,13 +754,13 @@ fig1c <- ggplot(fig1c_df) +
 ```
 
 ```{r}
-eObjFig1d <- elasticities("glaucoma, suspect", master_dx_df)
-fig1d_df <- as.data.frame(eObjFig1d[[8]])
-fig1d_df$date <- as.Date(fig1d_df$date)
+eObjFig2d <- elasticities("glaucoma, suspect", master_dx_df)
+fig2d_df <- as.data.frame(eObjFig1d[[8]])
+fig2d_df$date <- as.Date(fig2d_df$date)
 ```
 
 ```{r}
-fig1d <- ggplot(fig1d_df) +
+fig2d <- ggplot(fig2d_df) +
   geom_line(aes(x = date, y = Y, col ='Observed')) +
   geom_line(aes(x = date, y = predicted, col = 'Predicted')) +
   geom_ribbon(aes(x = date, ymin = lowerPI, ymax = upperPI, fill = 'Predicted', color = 'Predicted'),  alpha = 0.15, show.legend = F) +
@@ -775,23 +775,23 @@ fig1d <- ggplot(fig1d_df) +
 ```
 
 ```{r, fig.width=4, fig.height=2}
-fig1 <- ggarrange(fig1a + rremove("axis.title"), fig1b + rremove("axis.title"), fig1c + rremove("axis.title"), fig1d + rremove("axis.title"), labels = c("A", "B", "C", "D"),
+fig2 <- ggarrange(fig2a + rremove("axis.title"), fig2b + rremove("axis.title"), fig2c + rremove("axis.title"), fig2d + rremove("axis.title"), labels = c("A", "B", "C", "D"),
           common.legend = TRUE, 
           legend = "top")
-annotate_figure(fig1, left = text_grob("Number of patients", rot = 90, size = 10), bottom = text_grob("Month of diagnosis documentation", size = 10))
+annotate_figure(fig2, left = text_grob("Number of patients", rot = 90, size = 10), bottom = text_grob("Month of diagnosis documentation", size = 10))
 ```
 
 ### 1E: Heatmap of non-severe Big 4 eye conditions  
 
 ```{r}
-col_fun_fig1e = colorRamp2(c(-4, 0, 4), c("#de425b", "#eeeeee", "#21a6db"))
-col_fun_fig1e(seq(-3, 3))
+col_fun_fig2e = colorRamp2(c(-4, 0, 4), c("#de425b", "#eeeeee", "#21a6db"))
+col_fun_fig2e(seq(-3, 3))
 ```
 
 ```{r}
-fig1edxlist <- c("glaucoma, suspect", "cataract, age-related", "NPDR w/o DME", "dry AMD, early stage")
-fig1edata <- master_devsWeighted[rownames(master_devsWeighted) %in% fig1edxlist, c(1:24)]
-fig1edataNums <- master_devsOrig[rownames(master_devsOrig) %in% fig1edxlist, c(1:24)]
+fig2edxlist <- c("glaucoma, suspect", "cataract, age-related", "NPDR w/o DME", "dry AMD, early stage")
+fig2edata <- master_devsWeighted[rownames(master_devsWeighted) %in% fig2edxlist, c(1:24)]
+fig2edataNums <- master_devsOrig[rownames(master_devsOrig) %in% fig2edxlist, c(1:24)]
 ```
 
 ```{r, fig.asp = 0.2}
@@ -815,15 +815,15 @@ ComplexHeatmap::draw(fig2hm, heatmap_legend_side = "top")
   
 ```{r}
 library(gridExtra)
-grobFig1 <- annotate_figure(fig1, left = text_grob("Number of patients", rot = 90, size = 10), bottom = text_grob("Month of diagnosis documentation", size = 10))
-grobFig2 <- grid.grabExpr(ComplexHeatmap::draw(fig2hm, heatmap_legend_side = "bottom"))
+grobFig2 <- annotate_figure(fig2, left = text_grob("Number of patients", rot = 90, size = 10), bottom = text_grob("Month of diagnosis documentation", size = 10))
+grobFig2_final <- grid.grabExpr(ComplexHeatmap::draw(fig2hm, heatmap_legend_side = "bottom"))
 Fig2label <- textGrob("E", x = unit(0.032, "npc"), y = unit(0.5, "npc"), just = "left", gp = gpar(fontsize = 14, fontface = 'bold'))
 ```
 
 ```{r}
-pdf(file="/Users/charlesli/Library/CloudStorage/OneDrive-AmericanAcademyofOphthalmology/covid-elasticity-paper/outputs/06072022/main-figs/figure-1.pdf", width = 9.5, height = 6)
+pdf(file="main-figures/figure-2.pdf", width = 9.5, height = 6)
 
-grid.draw(grid.arrange(grobFig1, Fig2label, grobFig2,
+grid.draw(grid.arrange(grobFig2, Fig2label, grobFig2_final,
                    widths = c(0.08, 1.25),
                    heights = c(4, 0.15, 2.25),
                    layout_matrix = rbind(c(1),
@@ -834,21 +834,19 @@ dev.off()
 ```
 
 
-## FIGURE 2
+## FIGURE 3
 
-### 2A: Overall & guide to interpretation
-
+### 3A: Overall & guide to interpretation
 ```{r}
-fig2a <- ggplot(master_summarystats, aes(x = meanAllpost, y = `2020-04-01`)) + geom_point(color = "red", alpha = 0.3) + labs(title = "Deviations over time for all diagnosis entities", y = "Deviation from Expectation, Apr '20", x = "Deviation from Expectation, Jun '20 - Dec '21") + geom_abline(intercept = 0, slope = 1, color="grey", linetype="dashed") + geom_vline(xintercept = 0) + geom_hline(yintercept = 0) + stat_ellipse(color = "red") + scale_x_continuous(limits = c(-1, 1)) + scale_y_continuous(limits = c(-1, 1)) + geom_label(x = 0.5, y = 0.5, label = "Consistently above expectation") + geom_label(x = -0.5, y = 0.5, label = "Above expectation during hiatus \n Below expectation post-hiatus") + geom_label(x = -0.5, y = -0.5, label = "Consistently below expectation") + geom_label(x = 0.5, y = -0.5, label = "Below expectation during hiatus \n Above expectation post-hiatus") + annotate("text", x=0, y=0.05, label="equal deviation over time", color = "darkgrey", angle = 20) + theme_bw() #+ annotate("text", x = 0.5, y = -0.95, label = "Full rebound", color = "blue") + annotate("text", x = -0.5, y = -0.95, label = "Partial rebound", color = "blue")
-fig2a
+fig3a <- ggplot(master_summarystats, aes(x = meanAllpost, y = `2020-04-01`)) + geom_point(color = "red", alpha = 0.3) + labs(title = "Deviations over time for all diagnosis entities", y = "Deviation from Expectation, Apr '20", x = "Deviation from Expectation, Jun '20 - Dec '21") + geom_abline(intercept = 0, slope = 1, color="grey", linetype="dashed") + geom_vline(xintercept = 0) + geom_hline(yintercept = 0) + stat_ellipse(color = "red") + scale_x_continuous(limits = c(-1, 1)) + scale_y_continuous(limits = c(-1, 1)) + geom_label(x = 0.5, y = 0.5, label = "Consistently above expectation") + geom_label(x = -0.5, y = 0.5, label = "Above expectation during hiatus \n Below expectation post-hiatus") + geom_label(x = -0.5, y = -0.5, label = "Consistently below expectation") + geom_label(x = 0.5, y = -0.5, label = "Below expectation during hiatus \n Above expectation post-hiatus") + annotate("text", x=0, y=0.05, label="equal deviation over time", color = "darkgrey", angle = 20) + theme_bw() #+ annotate("text", x = 0.5, y = -0.95, label = "Full rebound", color = "blue") + annotate("text", x = -0.5, y = -0.95, label = "Partial rebound", color = "blue")
+fig3a
 ```
 
 ```{r}
 View(master_summarystats[master_summarystats$meanAllpost >= 0, c('entity_name','meanAllpost', 'confintAllpost', 'pvalEmpricialAllpost')]) #15 conditions 
 ```
 
-### 2B: Categories
-
+### 3B: Categories
 ```{r}
 all_sp_df3 <- aggregate(master_summarystats[,c('meanAllpost', '2020-04-01')], list(master_summarystats$Category), mean)
 all_sp_df3_size <- aggregate(master_summarystats[,c('mean_monthly_pts')], list(master_summarystats$Category), sum)
@@ -872,7 +870,7 @@ sd(master_summarystats$meanAllpost)
 ```
 
 ```{r, fig.width=5, fig.height=2}
-fig2b <- ggplot(all_sp_df3, aes(x = PostSpr2020_wtd, y = Apr2020, label = DiagnosisCategory)) +
+fig3b <- ggplot(all_sp_df3, aes(x = PostSpr2020_wtd, y = Apr2020, label = DiagnosisCategory)) +
   labs(title = "Average deviations over time by diagnosis category", 
        y ="Deviation from Expectation, Apr '20", 
        x = "Deviation from Expectation, Jun '20 - Dec '21") + 
@@ -892,25 +890,20 @@ fig2b <- ggplot(all_sp_df3, aes(x = PostSpr2020_wtd, y = Apr2020, label = Diagno
                               label.theme = element_text(size = 10)),
          size = guide_legend(title = "Total patient volume",
                              override.aes = list(label = "")))
-fig2b
+fig3b
 ```
 
 ```{r}
-pdf(file="/Users/charlesli/Library/CloudStorage/OneDrive-AmericanAcademyofOphthalmology/covid-elasticity-paper/outputs/06072022/main-figs/figure-2.pdf", width = 8.5, height = 8, onefile = FALSE)
+pdf(file="main-figures/figure-3.pdf", width = 8.5, height = 8, onefile = FALSE)
 
-ggarrange(ggplotGrob(ggdraw(fig2a)), ggplotGrob(fig2b), ncol = 1, nrow = 2, labels = c("A", "B"), heights = c(0.7, 1))
+ggarrange(ggplotGrob(ggdraw(fig3a)), ggplotGrob(fig3b), ncol = 1, nrow = 2, labels = c("A", "B"), heights = c(0.7, 1))
 
 dev.off()
 ```
 
-```{r}
-#lm(all_sp_df$PostSpr2020_wtd ~ all_sp_df$Apr2020)
-#cor.test(all_sp_df3$PostSpr2020_wtd, all_sp_df3$Apr2020)
-```
+## FIGURE 4
 
-## FIGURE 3
-
-### 3A: Big 4 Conditions
+### 4A: Big 4 Conditions
 ```{r}
 vehss_dx_list <- as.list(unique(vehss_idx$DiagnosisEntity))
 big4_dx_list <- unlist(unique(c(unique(icd_df[icd_df$Category == 'Glaucoma', 'Diagnosis.Name']), unique(icd_df[icd_df$Category == 'Cataract and other lens disorders', 'Diagnosis.Name']), vehss_dx_list)))
@@ -919,11 +912,11 @@ big4_sp_df <- master_summarystats[master_summarystats$entity_name %in% big4_dx_l
 big4_sp_df <- merge(big4_sp_df, vehss_idx[, c(1,3)], by.x = "entity_name", by.y = "DiagnosisEntity", all.x = TRUE)
 big4_sp_df$dx_category_final <- ifelse(big4_sp_df$Category == "Retinal and vitreous conditions", big4_sp_df$Big4Category, big4_sp_df$Category)
 
-fig3excldxlist <- c("iridodialysis", "DME resolved after tx", "glaucoma, absolute", "glaucoma, PXG", "aphakia", "wet AMD, inactive scar", "lens dislocation", "PDR, stable", "IOL displacement")
+fig4excldxlist <- c("iridodialysis", "DME resolved after tx", "glaucoma, absolute", "glaucoma, PXG", "aphakia", "wet AMD, inactive scar", "lens dislocation", "PDR, stable", "IOL displacement")
 ```
 
 ```{r, fig.width=5, fig.height=2}
-fig3a <- ggplot(big4_sp_df[big4_sp_df$entity_name %in% accurate_dx_list, ], aes(x = meanAllpost, y = `2020-04-01`, color = dx_category_final, label = ifelse(stringr::str_detect(entity_name, "other|unspec") | nchar(entity_name) > 25 | entity_name %in% fig3excldxlist, "", entity_name), size = mean_monthly_pts)) + geom_point(alpha = 0.4) + geom_text_repel(max.overlaps = Inf, size = 3, box.padding = 0.15, segment.alpha = 0.4, min.segment.length = 0, force_pull = -0.0075, force = 3) + geom_vline(xintercept = 0) + geom_hline(yintercept = 0) + geom_abline(intercept = 0, slope = 1, color="grey", linetype="dashed") + guides(color = guide_legend(override.aes = aes(label = ""), order = 1)) + scale_size_area() + labs(title = "Deviations over time for common eye diseases: DR, AMD, cataract, glaucoma", y = "Deviation from Expectation, Apr '20", x = "Deviation from Expectation, Jun '20 - Dec '21", size = "Average monthly volume", color = "Diagnosis category") + annotate("text", x=-0.5, y=-0.05, label="r = 0.025", size = 3.25, col = 'blue') + theme_bw() #+ scale_x_continuous(expand = expansion(mult = 0.1), limits = c(-0.6, 0.4)) + + scale_y_continuous(expand = expansion(mult = 0.1)) 
+fig4a <- ggplot(big4_sp_df[big4_sp_df$entity_name %in% accurate_dx_list, ], aes(x = meanAllpost, y = `2020-04-01`, color = dx_category_final, label = ifelse(stringr::str_detect(entity_name, "other|unspec") | nchar(entity_name) > 25 | entity_name %in% fig4excldxlist, "", entity_name), size = mean_monthly_pts)) + geom_point(alpha = 0.4) + geom_text_repel(max.overlaps = Inf, size = 3, box.padding = 0.15, segment.alpha = 0.4, min.segment.length = 0, force_pull = -0.0075, force = 3) + geom_vline(xintercept = 0) + geom_hline(yintercept = 0) + geom_abline(intercept = 0, slope = 1, color="grey", linetype="dashed") + guides(color = guide_legend(override.aes = aes(label = ""), order = 1)) + scale_size_area() + labs(title = "Deviations over time for common eye diseases: DR, AMD, cataract, glaucoma", y = "Deviation from Expectation, Apr '20", x = "Deviation from Expectation, Jun '20 - Dec '21", size = "Average monthly volume", color = "Diagnosis category") + annotate("text", x=-0.5, y=-0.05, label="r = 0.025", size = 3.25, col = 'blue') + theme_bw() #+ scale_x_continuous(expand = expansion(mult = 0.1), limits = c(-0.6, 0.4)) + + scale_y_continuous(expand = expansion(mult = 0.1)) 
 ```
 
 ```{r}
@@ -934,34 +927,31 @@ cor.test(big4_sp_df[big4_sp_df$entity_name %in% accurate_dx_list, 'meanAllpost']
 View(big4_sp_df[big4_sp_df$dx_category_final == 'AMD', c('entity_name', '2020-04-01', 'meanAllpost')])
 ```
 
-
-### 3B: Neuro-ophthalmic diseases
+### 4B: Neuro-ophthalmic diseases
 ```{r}
 neurooph_sp_df <-  master_summarystats[master_summarystats$Category == 'Neuro-ophthalmology', ]
 ```
 
 ```{r, fig.width=5, fig.height=2.25}
-fig3b <- ggplot(neurooph_sp_df, aes(x = meanAllpost, y = `2020-04-01`, label = ifelse(stringr::str_detect(entity_name, "other|unspec"), "", entity_name), size = mean_monthly_pts)) + geom_point(color = 'lightpink') + geom_text_repel(max.overlaps = Inf, size = 3, box.padding = 0.75, segment.alpha = 0.3, min.segment.length = 0, force_pull = 0, force = 1) + geom_vline(xintercept = 0) + geom_hline(yintercept = 0) + geom_abline(intercept = 0, slope = 1, color="grey", linetype="dashed") + scale_size_area() + labs(title = "Deviations over time for neuro-ophthalmic conditions", y = "Deviation from Expectation, Apr '20", x = "Deviation from Expectation, Jun '20 - Dec '21", size = "Average monthly volume") + theme_bw() + annotate("text", x=-0.3, y=-0.05, label="r = 0.729", size = 3.25, col = 'blue') 
+fig4b <- ggplot(neurooph_sp_df, aes(x = meanAllpost, y = `2020-04-01`, label = ifelse(stringr::str_detect(entity_name, "other|unspec"), "", entity_name), size = mean_monthly_pts)) + geom_point(color = 'lightpink') + geom_text_repel(max.overlaps = Inf, size = 3, box.padding = 0.75, segment.alpha = 0.3, min.segment.length = 0, force_pull = 0, force = 1) + geom_vline(xintercept = 0) + geom_hline(yintercept = 0) + geom_abline(intercept = 0, slope = 1, color="grey", linetype="dashed") + scale_size_area() + labs(title = "Deviations over time for neuro-ophthalmic conditions", y = "Deviation from Expectation, Apr '20", x = "Deviation from Expectation, Jun '20 - Dec '21", size = "Average monthly volume") + theme_bw() + annotate("text", x=-0.3, y=-0.05, label="r = 0.729", size = 3.25, col = 'blue') 
 ```
 
 ```{r}
 cor.test(neurooph_sp_df$meanAllpost, neurooph_sp_df$`2020-04-01`)
 ```
-
-```{r}
-pdf(file="/Users/charlesli/Library/CloudStorage/OneDrive-AmericanAcademyofOphthalmology/covid-elasticity-paper/outputs/06072022/main-figs/figure-3.pdf", width = 9, height = 8, onefile = FALSE)
-
-ggarrange(ggplotGrob(ggdraw(fig3a)), ggplotGrob(fig3b), ncol = 1, nrow = 2, labels = c("A", "B"), heights = c(0.5, 0.5))
-
-dev.off()
-```
-
 ```{r}
 View(neurooph_sp_df[, c('entity_name', '2020-04-01', 'meanAllpost')])
 ```
 
+```{r}
+pdf(file="main-figures/figure-4.pdf", width = 9, height = 8, onefile = FALSE)
 
-## FIGURE 4
+ggarrange(ggplotGrob(ggdraw(fig4a)), ggplotGrob(fig4b), ncol = 1, nrow = 2, labels = c("A", "B"), heights = c(0.5, 0.5))
+
+dev.off()
+```
+
+## FIGURE 5
 ```{r}
 mapped_dx_list <- as.list(unique(severity_idx$MAPPED_ENTITY_NAME))
 mapped_dx_list <- mapped_dx_list[mapped_dx_list %in% accurate_dx_list]
@@ -969,93 +959,47 @@ mapped_dx_list <- mapped_dx_list[mapped_dx_list %in% accurate_dx_list]
 obj1_boxplot_b <- master_summarystats[master_summarystats$entity_name %in% mapped_dx_list, c('entity_name', 'meanAllpost', '2020-04-01')]
 obj3_final_b <- merge(obj1_boxplot_b, severity_idx, by.x = 'entity_name', by.y = 'MAPPED_ENTITY_NAME')
 
-fig4Ahyptest <- tidyr::gather(obj3_final_b, timeperiod, deviation, c(meanAllpost,`2020-04-01`), factor_key=TRUE)
-fig4Ahyptest$deviation <- as.numeric(fig4Ahyptest$deviation)
-fig4Ahyptest <- unique(fig4Ahyptest[, c('entity_name', 'MEDIAN_WEIGHT', 'timeperiod', 'deviation')])
+fig5Ahyptest <- tidyr::gather(obj3_final_b, timeperiod, deviation, c(meanAllpost,`2020-04-01`), factor_key=TRUE)
+fig5Ahyptest$deviation <- as.numeric(fig5Ahyptest$deviation)
+fig5Ahyptest <- unique(fig5Ahyptest[, c('entity_name', 'MEDIAN_WEIGHT', 'timeperiod', 'deviation')])
 ```
 
-### 4A: Ocular emergencies
+### 5A: Ocular emergencies
 
 *Kruskal-Wallis rank sum test:*
 ```{r}
-kruskal.test(deviation ~ as.factor(MEDIAN_WEIGHT), data = fig4Ahyptest[fig4Ahyptest$timeperiod == '2020-04-01', ])
+kruskal.test(deviation ~ as.factor(MEDIAN_WEIGHT), data = fig5Ahyptest[fig5Ahyptest$timeperiod == '2020-04-01', ])
 ```
 
 ```{r}
-kruskal.test(deviation ~ as.factor(MEDIAN_WEIGHT), data = fig4Ahyptest[fig4Ahyptest$timeperiod == 'meanAllpost', ])
+kruskal.test(deviation ~ as.factor(MEDIAN_WEIGHT), data = fig5Ahyptest[fig5Ahyptest$timeperiod == 'meanAllpost', ])
 ```
 
 *Linear regression:*
-
-https://www.theanalysisfactor.com/likert-scale-items-as-predictor-variables-in-regression/  
-https://www.theanalysisfactor.com/interpreting-regression-coefficients/ 
-
 ```{r}
-summary(glm(as.numeric(deviation) ~ as.numeric(MEDIAN_WEIGHT), data = fig4Ahyptest[fig4Ahyptest$timeperiod == '2020-04-01', ], family = "gaussian"))
+summary(glm(as.numeric(deviation) ~ as.numeric(MEDIAN_WEIGHT), data = fig5Ahyptest[fig5Ahyptest$timeperiod == '2020-04-01', ], family = "gaussian"))
 ```
 
 ```{r}
-summary(glm(as.numeric(deviation) ~ as.numeric(MEDIAN_WEIGHT), data = fig4Ahyptest[fig4Ahyptest$timeperiod == 'meanAllpost', ], family = "gaussian"))
-```
-
-*Logistic regression: *
-
-```{r}
-fig4Ahyptest$severity_rank <- relevel(as.factor(fig4Ahyptest$MEDIAN_WEIGHT), ref = "1")
-```
-
-```{r}
-summary(glm(as.numeric(deviation) ~ severity_rank, data = fig4Ahyptest[fig4Ahyptest$timeperiod == '2020-04-01', ], family = "gaussian"))
-```
-
-```{r}
-summary(glm(as.numeric(deviation) ~ severity_rank, data = fig4Ahyptest[fig4Ahyptest$timeperiod == 'meanAllpost', ], family = "gaussian"))
+summary(glm(as.numeric(deviation) ~ as.numeric(MEDIAN_WEIGHT), data = fig5Ahyptest[fig5Ahyptest$timeperiod == 'meanAllpost', ], family = "gaussian"))
 ```
 
 ```{r, fig.width=5, fig.height=2}
-fig4a <- ggplot(fig4Ahyptest, aes(x = as.factor(MEDIAN_WEIGHT), y = as.numeric(deviation), fill = timeperiod)) + geom_boxplot(position = 'dodge') + labs(title = paste('Deviations from expectation vs. condition severity for', length(unique(fig4Ahyptest$entity_name)),'ocular emergencies'), x = 'Severity Index (BaSe SCOrE)', y = 'Deviation from Expectation', fill = "Time period") + scale_fill_manual(labels = c("Jun '20 - Dec '21", "Apr '20"), values = c("lightblue", "lightsalmon")) + ylim(c(-1, 0.25)) + geom_hline(yintercept = 0) + theme_bw()
+fig5a <- ggplot(fig5Ahyptest, aes(x = as.factor(MEDIAN_WEIGHT), y = as.numeric(deviation), fill = timeperiod)) + geom_boxplot(position = 'dodge') + labs(title = paste('Deviations from expectation vs. condition severity for', length(unique(fig5Ahyptest$entity_name)),'ocular emergencies'), x = 'Severity Index (BaSe SCOrE)', y = 'Deviation from Expectation', fill = "Time period") + scale_fill_manual(labels = c("Jun '20 - Dec '21", "Apr '20"), values = c("lightblue", "lightsalmon")) + ylim(c(-1, 0.25)) + geom_hline(yintercept = 0) + theme_bw()
 
-fig4a <- fig4a + scale_x_discrete(breaks = c(1:5), labels = seq(1, 5, 1)) + geom_bracket(inherit.aes = F, xmin = 0.82, xmax = 4.82, y.position = 0.1, label = "Kruskal-Wallis test, p = 0.05", color = "dark grey", tip.length = 0.02) + geom_bracket(xmin = 1.18, xmax = 5.18, y.position = -0.9, inherit.aes = F, label = "", color = "dark grey", tip.length = -0.02) + annotate("text", label = "Kruskal-Wallis test, p = 0.002", y = -0.865, x = 2.75, color = "dark grey")
+fig5a <- fig5a + scale_x_discrete(breaks = c(1:5), labels = seq(1, 5, 1)) + geom_bracket(inherit.aes = F, xmin = 0.82, xmax = 4.82, y.position = 0.1, label = "Kruskal-Wallis test, p = 0.05", color = "dark grey", tip.length = 0.02) + geom_bracket(xmin = 1.18, xmax = 5.18, y.position = -0.9, inherit.aes = F, label = "", color = "dark grey", tip.length = -0.02) + annotate("text", label = "Kruskal-Wallis test, p = 0.002", y = -0.865, x = 2.75, color = "dark grey")
 
-fig4a
+fig5a
 ```
 
-```{r}
-fig4Ahyptest %>%
-  group_by(MEDIAN_WEIGHT) %>%
-  summarise(avg = mean(deviation),
-            sd = sd(deviation),
-            med = median(deviation),
-            iqr = IQR(deviation))
-```
-
-```{r}
-fig4Ahyptest[fig4Ahyptest$timeperiod == '2020-04-01', ] %>%
-  group_by(MEDIAN_WEIGHT) %>%
-  summarise(avg = mean(deviation),
-            sd = sd(deviation),
-            med = median(deviation),
-            iqr = IQR(deviation))
-```
-
-```{r}
-fig4Ahyptest[fig4Ahyptest$timeperiod == 'meanAllpost', ] %>%
-  group_by(MEDIAN_WEIGHT) %>%
-  summarise(avg = mean(deviation),
-            sd = sd(deviation),
-            med = median(deviation),
-            iqr = IQR(deviation))
-```
-
-
-### 4B: DR, AMD, Glaucoma
+### 5B: DR, AMD, Glaucoma
 ```{r}
 obj1_boxplot_v <- master_summarystats[master_summarystats$entity_name %in% vehss_dx_list, c('entity_name', 'meanAllpost', '2020-04-01')]
 obj3_final_v <- merge(obj1_boxplot_v, vehss_idx, by.x = 'entity_name', by.y = 'DiagnosisEntity')
 
-fig4Bhyptest <- tidyr::gather(obj3_final_v[obj3_final_v$entity_name %in% accurate_dx_list,], timeperiod, deviation, c(meanAllpost,`2020-04-01`), factor_key=TRUE)
-fig4Bhyptest$deviation <- as.numeric(fig4Bhyptest$deviation)
-fig4Bhyptest <- unique(fig4Bhyptest[, c("entity_name", "Big4Category", "Type", "timeperiod", "deviation")]) #doesn't do anything?
+fig5Bhyptest <- tidyr::gather(obj3_final_v[obj3_final_v$entity_name %in% accurate_dx_list,], timeperiod, deviation, c(meanAllpost,`2020-04-01`), factor_key=TRUE)
+fig5Bhyptest$deviation <- as.numeric(fig5Bhyptest$deviation)
+fig5Bhyptest <- unique(fig5Bhyptest[, c("entity_name", "Big4Category", "Type", "timeperiod", "deviation")])
 ```
 
 ```{r}
@@ -1067,14 +1011,14 @@ fig4Bhyptest <- fig4Bhyptest[fig4Bhyptest$entity_name != "glaucoma, other/unspec
 ```
 
 ```{r}
-fig4b <- ggplot(fig4Bhyptest, aes(x = as.factor(Type), y = as.numeric(deviation), fill = timeperiod)) +  facet_wrap(~Big4Category) + geom_boxplot(position = 'dodge') + labs(title = paste('Deviations from expectation vs. VT status for DR, AMD, and glaucoma diagnoses'), x = 'Vision-Threatening Status', y = 'Deviation from Expectation', fill = "Time period") + geom_hline(yintercept = 0) + theme_bw() + scale_fill_manual(labels = c("Jun '20 - Dec '21", "Apr '20"), values = c("lightblue", "lightsalmon"))
-fig4b
+fig5b <- ggplot(fig5Bhyptest, aes(x = as.factor(Type), y = as.numeric(deviation), fill = timeperiod)) +  facet_wrap(~Big4Category) + geom_boxplot(position = 'dodge') + labs(title = paste('Deviations from expectation vs. VT status for DR, AMD, and glaucoma diagnoses'), x = 'Vision-Threatening Status', y = 'Deviation from Expectation', fill = "Time period") + geom_hline(yintercept = 0) + theme_bw() + scale_fill_manual(labels = c("Jun '20 - Dec '21", "Apr '20"), values = c("lightblue", "lightsalmon"))
+fig5b
 ```
 
 ```{r}
-fig4Bstattest <- compare_means(deviation ~ Type, data = fig4Bhyptest, group.by = c('Big4Category', 'timeperiod'))
-fig4Bstattest <- fig4Bstattest[order(fig4Bstattest$Big4Category), ]
-fig4Bstattest
+fig5Bstattest <- compare_means(deviation ~ Type, data = fig5Bhyptest, group.by = c('Big4Category', 'timeperiod'))
+fig5Bstattest <- fig5Bstattest[order(fig5Bstattest$Big4Category), ]
+fig5Bstattest
 ```
 
 ```{r}
@@ -1088,23 +1032,23 @@ plabels <- data.frame(
 )
 ```
 
-
 ```{r, fig.width=5, fig.height=2}
-fig4b <- fig4b + geom_bracket(data = plabels,
+fig5b <- fig5b + geom_bracket(data = plabels,
                     mapping = aes(xmin = xmins, xmax = xmaxs, y.position = ypos, label = labels),
                     color = "dark grey",
                     tip.length = 0.015) + guides(color = F)
-fig4b
+fig5b
 ```
-```{r}
-pdf(file="/Users/charlesli/Library/CloudStorage/OneDrive-AmericanAcademyofOphthalmology/covid-elasticity-paper/outputs/06072022/main-figs/figure-4.pdf", width = 9, height = 8, onefile = FALSE)
 
-ggarrange(fig4a, fig4b, ncol = 1, nrow = 2, labels = c("A", "B"), heights = c(0.5, 0.5), common.legend = T, legend = "bottom")
+```{r}
+pdf(file="main-figures/figure-5.pdf", width = 9, height = 8, onefile = FALSE)
+
+ggarrange(fig5a, fig5b, ncol = 1, nrow = 2, labels = c("A", "B"), heights = c(0.5, 0.5), common.legend = T, legend = "bottom")
 
 dev.off()
 ```
 
-## FIGURE 5
+## FIGURE 6
 
 ### Time to recovery
 
@@ -1149,7 +1093,7 @@ master_summarystats$recoveredMonthNum <- ifelse(master_summarystats$recoveredMon
 ```{r}
 circos.clear()
 
-pdf(file="/Users/charlesli/Library/CloudStorage/OneDrive-AmericanAcademyofOphthalmology/covid-elasticity-paper/outputs/06072022/main-figs/figure-5.pdf")
+pdf(file="main-figures/figure-6.pdf")
 
 #1. graphical parameters
 circos.par("start.degree" = 90, #the starting degree where the first sector is put (polar coordinate system)
@@ -1263,7 +1207,7 @@ ComplexHeatmap::draw(lgd_listB, x = unit(14, "cm"), y = unit(0.10, "cm"), just =
 dev.off()
 ```
 
-# Supplemental / exploratory figures
+# Supplemental / exploratory figures (LEFT OFF HERE ON RE-RUN 6 MAR 2023 4:44PM)
 
 ### FIGURE S1: Deviations faceted by category
 
