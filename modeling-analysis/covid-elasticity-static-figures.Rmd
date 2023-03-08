@@ -446,12 +446,12 @@ return(res)
 ```
 
 ## Model and diagnosis entity summaries
-```{r, eval=FALSE}
+```{r}
 hm_dx_list<- as.list(unique(icd_df$Diagnosis.Name))
 obj1 <- lapply(hm_dx_list, elasticities, master_dx_df) #elasticity objects for all dx entities
 ```
 
-```{r, eval=FALSE}
+```{r}
 model_dx_name <- lapply(obj1,'[[',1) #the name of the diagnosis entity
 model_spec <- lapply(obj1,'[[',2) #the formula of the selected model
 model_MSE <- lapply(lapply(obj1,'[[',3), '[[', 2)
@@ -485,7 +485,7 @@ master_dx_df %>%
   )
 ```
 
-```{r, eval=FALSE}
+```{r}
 df_models <- merge(df_models, master_dx_df_sum, by.x = "Diagnosis Name", by.y = "dx_name")
 ```
 
@@ -755,7 +755,7 @@ fig2c <- ggplot(fig2c_df) +
 
 ```{r}
 eObjFig2d <- elasticities("glaucoma, suspect", master_dx_df)
-fig2d_df <- as.data.frame(eObjFig1d[[8]])
+fig2d_df <- as.data.frame(eObjFig2d[[8]])
 fig2d_df$date <- as.Date(fig2d_df$date)
 ```
 
@@ -795,7 +795,7 @@ fig2edataNums <- master_devsOrig[rownames(master_devsOrig) %in% fig2edxlist, c(1
 ```
 
 ```{r, fig.asp = 0.2}
-fig2hm <- Heatmap(as.matrix(fig1edata), 
+fig2hm <- Heatmap(as.matrix(fig2edata), 
         row_names_gp = grid::gpar(fontsize = 8),
         column_names_gp = grid::gpar(fontsize = 8),
         row_gap = unit(2, "mm"),
@@ -804,11 +804,11 @@ fig2hm <- Heatmap(as.matrix(fig1edata),
         cluster_row_slices = FALSE, 
         cluster_columns = F, 
         cluster_rows = F,
-        col = col_fun_fig1e, 
+        col = col_fun_fig2e, 
         rect_gp = gpar(col = "dark grey", lwd = 2),
         heatmap_legend_param = list(title = "", title_gp = gpar(fontsize = 8, fontface = 'bold'), direction = "horizontal", labels_gp = gpar(fontsize = 8), labels = c(expression(-delta*"*"), "", "", "", expression(+delta*"*"))),
         cell_fun = function(j, i, x, y, width, height, fill) {
-        grid.text(format(as.numeric(sprintf("%.2f", fig1edataNums[i, j])), nsmall = 2), x, y, gp = gpar(fontsize = 8))}
+        grid.text(format(as.numeric(sprintf("%.2f", fig2edataNums[i, j])), nsmall = 2), x, y, gp = gpar(fontsize = 8))}
         )
 ComplexHeatmap::draw(fig2hm, heatmap_legend_side = "top") 
 ```
@@ -842,10 +842,6 @@ fig3a <- ggplot(master_summarystats, aes(x = meanAllpost, y = `2020-04-01`)) + g
 fig3a
 ```
 
-```{r}
-View(master_summarystats[master_summarystats$meanAllpost >= 0, c('entity_name','meanAllpost', 'confintAllpost', 'pvalEmpricialAllpost')]) #15 conditions 
-```
-
 ### 3B: Categories
 ```{r}
 all_sp_df3 <- aggregate(master_summarystats[,c('meanAllpost', '2020-04-01')], list(master_summarystats$Category), mean)
@@ -868,7 +864,6 @@ sd(master_summarystats$`2020-04-01`)
 mean(master_summarystats$meanAllpost) 
 sd(master_summarystats$meanAllpost) 
 ```
-
 ```{r, fig.width=5, fig.height=2}
 fig3b <- ggplot(all_sp_df3, aes(x = PostSpr2020_wtd, y = Apr2020, label = DiagnosisCategory)) +
   labs(title = "Average deviations over time by diagnosis category", 
@@ -909,7 +904,7 @@ vehss_dx_list <- as.list(unique(vehss_idx$DiagnosisEntity))
 big4_dx_list <- unlist(unique(c(unique(icd_df[icd_df$Category == 'Glaucoma', 'Diagnosis.Name']), unique(icd_df[icd_df$Category == 'Cataract and other lens disorders', 'Diagnosis.Name']), vehss_dx_list)))
 big4_sp_df <- master_summarystats[master_summarystats$entity_name %in% big4_dx_list, ]
 
-big4_sp_df <- merge(big4_sp_df, vehss_idx[, c(1,3)], by.x = "entity_name", by.y = "DiagnosisEntity", all.x = TRUE)
+big4_sp_df <- merge(big4_sp_df, vehss_idx[, c(1,2)], by.x = "entity_name", by.y = "DiagnosisEntity", all.x = TRUE)
 big4_sp_df$dx_category_final <- ifelse(big4_sp_df$Category == "Retinal and vitreous conditions", big4_sp_df$Big4Category, big4_sp_df$Category)
 
 fig4excldxlist <- c("iridodialysis", "DME resolved after tx", "glaucoma, absolute", "glaucoma, PXG", "aphakia", "wet AMD, inactive scar", "lens dislocation", "PDR, stable", "IOL displacement")
@@ -1003,14 +998,6 @@ fig5Bhyptest <- unique(fig5Bhyptest[, c("entity_name", "Big4Category", "Type", "
 ```
 
 ```{r}
-#reclassify "PDR, stable", "DME resolved after tx", "glaucoma, OAG", "glaucoma, PXG" as NVT
-fig4Bhyptest$Type <- ifelse(fig4Bhyptest$entity_name ==  "PDR, stable" | fig4Bhyptest$entity_name == "DME resolved after tx" | fig4Bhyptest$entity_name == "glaucoma, OAG" | fig4Bhyptest$entity_name == "glaucoma, PXG", "NVT", fig4Bhyptest$Type)
-
-#exclude "glaucoma, other/unspec"
-fig4Bhyptest <- fig4Bhyptest[fig4Bhyptest$entity_name != "glaucoma, other/unspec", ]
-```
-
-```{r}
 fig5b <- ggplot(fig5Bhyptest, aes(x = as.factor(Type), y = as.numeric(deviation), fill = timeperiod)) +  facet_wrap(~Big4Category) + geom_boxplot(position = 'dodge') + labs(title = paste('Deviations from expectation vs. VT status for DR, AMD, and glaucoma diagnoses'), x = 'Vision-Threatening Status', y = 'Deviation from Expectation', fill = "Time period") + geom_hline(yintercept = 0) + theme_bw() + scale_fill_manual(labels = c("Jun '20 - Dec '21", "Apr '20"), values = c("lightblue", "lightsalmon"))
 fig5b
 ```
@@ -1074,7 +1061,6 @@ ttr_func <- function(entity_name, input_df){
   }
   
   res <- list(recovered_month, fullRecovery)
-  
   return(res)
   
 }
@@ -1212,26 +1198,10 @@ dev.off()
 ### FIGURE S1: Deviations faceted by category
 
 ```{r}
-#define a function to compute the mean Mahalanobis distance given two dimensions (deviations/summary devs) 
-mhbDist <- function(dev1, dev2, dx_cat){
-  
-  df <- master_summarystats[master_summarystats$Category == dx_cat, c(dev1, dev2)]
-  
-  df.center <- colMeans(df)
-  df.cov <- cov(df)
-  distances <- mahalanobis(x = df , center = df.center, cov = df.cov)
-  
-  return(distances) 
-  
-}
-```
-
-```{r}
-#define a function to compute the mean pairwise Euclidean distances amongst all points in the cluster
+#define a function to compute the mean pairwise Euclidean distance among all points in a cluster
 eucDist <- function(dev1, dev2){
   
   df <- as.data.frame(cbind(dev1, dev2))
-  
   return(mean(dist(df, method = "euclidean")))
   
 }
@@ -1272,7 +1242,7 @@ text_eucdist$y <- -0.95
 ```
 
 ```{r, fig.width=4.5, fig.height=4}
-pdf(file="/Users/charlesli/Library/CloudStorage/OneDrive-AmericanAcademyofOphthalmology/covid-elasticity-paper/outputs/06072022/suppl-figs/figure-s1.pdf", width = 9, height = 8, onefile = FALSE)
+pdf(file="suppl-figs-tables/figure-s1.pdf", width = 9, height = 8, onefile = FALSE)
 
 ggplot(master_summarystats, aes(x = meanAllpost, y = `2020-04-01`)) + labs(title = "Deviations over time, stratified by diagnosis category", y = "Deviation from Expectation, Apr '20", x = "Deviation from Expectation, Jun '20 - Dec '21") + geom_point(color = "red", alpha = 0.3) + facet_wrap(~Category) + scale_x_continuous(limits = c(-0.75, 0.3)) + scale_y_continuous(limits = c(-1, 0)) + geom_vline(xintercept = 0) + geom_abline(intercept = 0, slope = 1, color="grey", linetype="dashed") + stat_ellipse(color = "red") + geom_hline(yintercept = 0) + geom_text(data = text_r.sq, aes(x = x, y = y, label = paste('r =', round(r.squared, 3))), inherit.aes = F, size = 2.85, col = 'blue') + geom_text(data = text_r.pv, aes(x = x, y = y, label = paste('p =', sprintf("%.3f", round(r.pvalue, 3)))), inherit.aes = F, size = 2.85, col = '#6495ED') + geom_text(data = text_eucdist, aes(x = x, y = y, label = paste('spread', sprintf("%.2f", round(eucdist, 2)))), inherit.aes = F, size = 2.85, col = 'purple') + theme_bw()
 
@@ -1281,7 +1251,7 @@ dev.off()
 
 ### FIGURE S2: Retinal diseases
 ```{r}
-retinal_dx_list <- master_summarystats[master_summarystats$Category == 'Retinal and vitreous conditions', 'entity_name'] 
+retinal_dx_list <- pull(master_summarystats[master_summarystats$Category == 'Retinal and vitreous conditions', 'entity_name']) 
 retinal_dx_list <- retinal_dx_list[!(retinal_dx_list %in% big4_dx_list)]
   
 retinal_sp_df <- master_summarystats[master_summarystats$entity_name %in% retinal_dx_list, ]
@@ -1299,20 +1269,21 @@ retinal_sp_df$Top10New <- ifelse(retinal_sp_df$Top10New != "Other background ret
 figS2excldxlist <- c("hypertensive retinopathy", "retinal vascular changes", "vitreomacular adhesion")
 ```
 
+```{r}
+cor.test(retinal_sp_df[, 'meanAllpost'], retinal_sp_df[, '2020-04-01'])
+```
+
 ```{r, fig.width=5, fig.height=2}
-pdf(file="/Users/charlesli/Library/CloudStorage/OneDrive-AmericanAcademyofOphthalmology/covid-elasticity-paper/outputs/06072022/suppl-figs/figure-s2.pdf", width = 9.25, height = 4, onefile = FALSE)
+pdf(file="suppl-figs-tables/figure-s2.pdf", width = 9.25, height = 4, onefile = FALSE)
 
 ggplot(retinal_sp_df, aes(x = meanAllpost, y = `2020-04-01`, color = Top10New, label = ifelse(stringr::str_detect(entity_name, "other|unspec") | nchar(entity_name) > 25 | mean_monthly_pts < 4300 | entity_name %in% figS2excldxlist, "", entity_name), size = mean_monthly_pts)) + geom_point(alpha = 0.4) + geom_text_repel(max.overlaps = Inf, size = 3, segment.alpha = 0.3, min.segment.length = 0, force_pull = 3.5, force = 4.5, box.padding = 0.3) + geom_vline(xintercept = 0) + geom_hline(yintercept = 0) + geom_abline(intercept = 0, slope = 1, color="grey", linetype="dashed") + scale_size_area() + labs(title = "Deviations over time for retinal and vitreous conditions (besides DR and AMD)", y = "Deviation from Expectation, Apr '20", x = "Deviation from Expectation, Jun '20 - Dec '21", color = "Diagnosis subcategory", size = "Average monthly volume") + guides(color = guide_legend(override.aes = aes(label = ""), order = 1)) + theme_bw() + annotate("text", x=-0.35, y=-0.05, label="r = 0.395", size = 3.25, col = 'blue')
 
 dev.off()
 ```
-```{r}
-cor.test(retinal_sp_df[, 'meanAllpost'], retinal_sp_df[, '2020-04-01'])
-```
 
 ### FIGURE S3: Corneal diseases
 ```{r}
-corneal_dx_list <- master_summarystats[master_summarystats$Category == 'Cornea and external disease', 'entity_name']
+corneal_dx_list <- pull(master_summarystats[master_summarystats$Category == 'Cornea and external disease', 'entity_name'])
 corneal_dx_list <- corneal_dx_list[corneal_dx_list %in% accurate_dx_list] 
 
 corneal_sp_df <- master_summarystats[master_summarystats$entity_name %in% corneal_dx_list, ]
@@ -1322,13 +1293,10 @@ corneal_top10_crosswalk$Top10 <- ifelse(corneal_top10_crosswalk$Diagnosis.Name =
 corneal_top10_crosswalk$Top10 <- ifelse(corneal_top10_crosswalk$Diagnosis.Name == "episcleritis", "Scleritis and episcleritis", corneal_top10_crosswalk$Top10)
 corneal_top10_crosswalk$Top10 <- ifelse(corneal_top10_crosswalk$Diagnosis.Name == "eyelid dermatoses - noninfectious", "Other inflammations of eyelids", corneal_top10_crosswalk$Top10)
 corneal_top10_crosswalk$Top10 <- ifelse(corneal_top10_crosswalk$Diagnosis.Name == "keratitis - infectious", "Other forms of keratitis", corneal_top10_crosswalk$Top10)
-corneal_top10_crosswalk$Top10 <- ifelse(corneal_top10_crosswalk$Diagnosis.Name == "other conjunctival disorders", "	
-Other disorders of conjunctiva", corneal_top10_crosswalk$Top10)
+corneal_top10_crosswalk$Top10 <- ifelse(corneal_top10_crosswalk$Diagnosis.Name == "other conjunctival disorders", "Other disorders of conjunctiva", corneal_top10_crosswalk$Top10)
 corneal_top10_crosswalk <- unique(corneal_top10_crosswalk)
 
 corneal_sp_df <- merge(corneal_sp_df, corneal_top10_crosswalk, by.x = "entity_name", by.y = "Diagnosis.Name")
-
-##View(table(corneal_sp_df$Top10))
 
 corneal_sp_df$Top10New <- ifelse(corneal_sp_df$Top10 == "Keratoconjunctivitis", "Conjunctivitis", corneal_sp_df$Top10)
 corneal_sp_df$Top10New <- ifelse(corneal_sp_df$Top10New == "Conjunctival vascular disorders and cysts" | corneal_sp_df$Top10New == "Conjunctival degenerations and deposits" | corneal_sp_df$Top10New == "Conjunctival scars" | corneal_sp_df$Top10New == "Other disorders of conjunctiva", "Other conjunctival disorders", corneal_sp_df$Top10New)
@@ -1339,20 +1307,21 @@ corneal_sp_df$Top10New <- ifelse(corneal_sp_df$Top10New != "Corneal degeneration
 figS3excldxlist <- c("trichiasis w/o entropion", "corneal degen - arcus senilis", "keratoconus")
 ```
 
+```{r}
+cor.test(corneal_sp_df[, 'meanAllpost'], corneal_sp_df[, '2020-04-01'])
+```
+
 ```{r, fig.width=5, fig.height=2.25}
-pdf(file="/Users/charlesli/Library/CloudStorage/OneDrive-AmericanAcademyofOphthalmology/covid-elasticity-paper/outputs/06072022/suppl-figs/figure-s3.pdf", width = 9.25, height = 4.25, onefile = FALSE)
+pdf(file="suppl-figs-tables/figure-s3.pdf", width = 9.25, height = 4.25, onefile = FALSE)
 
 ggplot(corneal_sp_df, aes(x = meanAllpost, y = `2020-04-01`, color = Top10New, label = ifelse(stringr::str_detect(entity_name, "other|unspec") | nchar(entity_name) > 30 | mean_monthly_pts < 4300 | entity_name %in% figS3excldxlist, "", entity_name), size = mean_monthly_pts)) + geom_point(alpha = 0.4) + geom_text_repel(max.overlaps = Inf, size = 3, box.padding = 0.5, force_pull = 0, segment.alpha = 0.3, min.segment.length = 0) + geom_vline(xintercept = 0) + geom_hline(yintercept = 0) + geom_abline(intercept = 0, slope = 1, color="grey", linetype="dashed") + scale_size_area() + labs(title = "Deviations over time for corneal and external conditions", y = "Deviation from Expectation, Apr '20", x = "Deviation from Expectation, Jun '20 - Dec '21", color = "Diagnosis subcategory", size = "Average monthly volume") + guides(color = guide_legend(override.aes = aes(label = ""), order = 1)) + scale_y_continuous(expand = expansion(mult = 0.5)) + theme_bw() + annotate("text", x=-0.35, y=0.05, label="r = 0.186", size = 3.25, col = 'blue')
 
 dev.off()
 ```
-```{r}
-cor.test(corneal_sp_df[, 'meanAllpost'], corneal_sp_df[, '2020-04-01'])
-```
 
 ### FIGURE S4: Oculoplastics diseases
 ```{r}
-oculoplast_dx_list <- master_summarystats[master_summarystats$Category == 'Oculofacial plastics and orbital conditions', 'entity_name']
+oculoplast_dx_list <- pull(master_summarystats[master_summarystats$Category == 'Oculoplastics and orbital conditions', 'entity_name'])
 oculoplast_dx_list <- oculoplast_dx_list[oculoplast_dx_list %in% accurate_dx_list] 
 
 oculoplast_sp_df <- master_summarystats[master_summarystats$entity_name %in% oculoplast_dx_list, ]
@@ -1362,8 +1331,6 @@ oculoplast_top10_crosswalk$Top10 <- ifelse(oculoplast_top10_crosswalk$Diagnosis.
 oculoplast_top10_crosswalk <- unique(oculoplast_top10_crosswalk)
 
 oculoplast_sp_df <- merge(oculoplast_sp_df, oculoplast_top10_crosswalk, by.x = "entity_name", by.y = "Diagnosis.Name")
-
-##View(table(oculoplast_sp_df$Top10))
 
 oculoplast_sp_df$Top10New <- ifelse(oculoplast_sp_df$Top10 == "Benign neoplasm of eye and adnexa", "Benign neoplasm", oculoplast_sp_df$Top10)
 oculoplast_sp_df$Top10New <- ifelse(oculoplast_sp_df$Top10New == "Malignant neoplasm of eye and adnexa", "Malignant neoplasm", oculoplast_sp_df$Top10New)
@@ -1376,20 +1343,21 @@ oculoplast_sp_df$Top10New <- ifelse(oculoplast_sp_df$Top10New != "Benign neoplas
 figS4excldxlist <- c('lacrimal passage stenosis/insufficiency', 'lacrimal passage infl - chronic', 'eyelid retraction', 'eyelid edema')
 ```
 
+```{r}
+cor.test(oculoplast_sp_df[, 'meanAllpost'], oculoplast_sp_df[, '2020-04-01'])
+```
+
 ```{r, fig.width=5, fig.height=2.25}
-pdf(file="/Users/charlesli/Library/CloudStorage/OneDrive-AmericanAcademyofOphthalmology/covid-elasticity-paper/outputs/06072022/suppl-figs/figure-s4.pdf", width = 9.25, height = 4.25, onefile = FALSE)
+pdf(file="suppl-figs-tables/figure-s4.pdf", width = 9.25, height = 4.25, onefile = FALSE)
 
 ggplot(oculoplast_sp_df, aes(x = meanAllpost, y = `2020-04-01`, color = Top10New, label = ifelse(stringr::str_detect(entity_name, "other|unspec") | entity_name %in% figS4excldxlist, "", entity_name), size = mean_monthly_pts)) + geom_point(alpha = 0.4) + geom_text_repel(max.overlaps = Inf, size = 3, box.padding = 0.4, force_pull = 0, segment.alpha = 0.3, min.segment.length = 0) + geom_vline(xintercept = 0) + geom_hline(yintercept = 0) + geom_abline(intercept = 0, slope = 1, color="grey", linetype="dashed") + scale_size_area() + labs(title = "Deviations over time for oculofacial plastics and orbital conditions", y = "Deviation from Expectation, Apr '20", x = "Deviation from Expectation, Jun '20 - Dec '21", color = "Diagnosis subcategory", size = "Average monthly volume") + guides(color = guide_legend(override.aes = aes(label = ""), order = 1)) + theme_bw() + annotate("text", x=-0.4, y=-0.05, label="r = 0.012", size = 3.25, col = 'blue')
 
 dev.off()
 ```
-```{r}
-cor.test(oculoplast_sp_df[, 'meanAllpost'], oculoplast_sp_df[, '2020-04-01'])
-```
 
 ### FIGURE S5: Uveitis/infl diseases
 ```{r}
-uveitis_dx_list <- master_summarystats[master_summarystats$Category == 'Uveitis and ocular inflammation', 'entity_name']
+uveitis_dx_list <- pull(master_summarystats[master_summarystats$Category == 'Uveitis and ocular inflammation', 'entity_name'])
 uveitis_dx_list <- uveitis_dx_list[uveitis_dx_list %in% accurate_dx_list] ##14 conditions
 
 uveitis_sp_df <- master_summarystats[master_summarystats$entity_name %in% uveitis_dx_list, ]
@@ -1402,28 +1370,26 @@ uveitis_top10_crosswalk <- unique(uveitis_top10_crosswalk) ##19 rows
 
 uveitis_sp_df <- merge(uveitis_sp_df, uveitis_top10_crosswalk, by.x = "entity_name", by.y = "Diagnosis.Name")
 
-##View(table(uveitis_sp_df$Top10))
-
 uveitis_sp_df$Top10New <- ifelse(uveitis_sp_df$Top10 == "Herpesviral ocular disease" | uveitis_sp_df$Top10 == "Toxoplasma oculopathy", "Other condition", uveitis_sp_df$Top10)
 
 figS5excldxlist <- c('herpesviral ocular disease', 'toxoplasma oculopathy')
 ```
 
+```{r}
+cor.test(uveitis_sp_df[, 'meanAllpost'], uveitis_sp_df[, '2020-04-01'])
+```
+
 ```{r, fig.width=5, fig.height=2}
-pdf(file="/Users/charlesli/Library/CloudStorage/OneDrive-AmericanAcademyofOphthalmology/covid-elasticity-paper/outputs/06072022/suppl-figs/figure-s5.pdf", width = 9.25, height = 4.25, onefile = FALSE)
+pdf(file="suppl-figs-tables/figure-s5.pdf", width = 9.25, height = 4.25, onefile = FALSE)
 
 ggplot(uveitis_sp_df, aes(x = meanAllpost, y = `2020-04-01`, color = Top10New, label = ifelse(entity_name %in% figS5excldxlist, "", entity_name), size = mean_monthly_pts)) + geom_point(alpha = 0.4) + geom_text_repel(max.overlaps = Inf, size = 3, box.padding = 0.5, force_pull = 0, segment.alpha = 0.3, min.segment.length = 0) + geom_vline(xintercept = 0) + geom_hline(yintercept = 0) + geom_abline(intercept = 0, slope = 1, color="grey", linetype="dashed") + scale_size_area() + labs(title = "Deviations over time for uveitis and ocular inflammation", y = "Deviation from Expectation, Apr '20", x = "Deviation from Expectation, Jun '20 - Dec '21", color = "Diagnosis subcategory", size = "Average monthly volume") + guides(color = guide_legend(override.aes = aes(label = ""), order = 1)) + theme_bw() + annotate("text", x=-0.3, y=-0.05, label="r = -0.421", size = 3.25, col = 'blue')
 
 dev.off()
 ```
-```{r}
-cor.test(uveitis_sp_df[, 'meanAllpost'], uveitis_sp_df[, '2020-04-01'])
-```
-
 
 ### FIGURE S6: Blindness / vision defect diseases
 ```{r}
-blindvdf_dx_list <- master_summarystats[master_summarystats$Category == 'Blindness and vision defects', 'entity_name']
+blindvdf_dx_list <- pull(master_summarystats[master_summarystats$Category == 'Blindness and vision defects', 'entity_name'])
 blindvdf_dx_list <- blindvdf_dx_list[blindvdf_dx_list %in% accurate_dx_list] ##14 conditions
 
 blindvdf_sp_df <- master_summarystats[master_summarystats$entity_name %in% blindvdf_dx_list, ]
@@ -1437,18 +1403,69 @@ blindvdf_sp_df$Top10New <- ifelse(!(blindvdf_sp_df$Top10 %in% c("Amblyopia ex an
 figS6excldxlist <- c('other binocular vision disorders')
 ```
 
+```{r}
+cor.test(blindvdf_sp_df[, 'meanAllpost'], blindvdf_sp_df[, '2020-04-01'])
+```
+
 ```{r, fig.width=5, fig.height=2}
-pdf(file="/Users/charlesli/Library/CloudStorage/OneDrive-AmericanAcademyofOphthalmology/covid-elasticity-paper/outputs/06072022/suppl-figs/figure-s6.pdf", width = 9.25, height = 4.25, onefile = FALSE)
+pdf(file="suppl-figs-tables/figure-s6.pdf", width = 9.25, height = 4.25, onefile = FALSE)
 
 ggplot(blindvdf_sp_df, aes(x = meanAllpost, y = `2020-04-01`, color = Top10New, label = ifelse(entity_name %in% figS6excldxlist, "", entity_name), size = mean_monthly_pts)) + geom_point(alpha = 0.4) + geom_text_repel(max.overlaps = Inf, size = 3, box.padding = 0.5, force_pull = 0, segment.alpha = 0.3, min.segment.length = 0) + geom_vline(xintercept = 0) + geom_hline(yintercept = 0) + geom_abline(intercept = 0, slope = 1, color="grey", linetype="dashed") + scale_size_area() + labs(title = "Deviations over time for blindness and vision defects", y = "Deviation from Expectation, Apr '20", x = "Deviation from Expectation, Jun '20 - Dec '21", color = "Diagnosis subcategory", size = "Average monthly volume") + guides(color = guide_legend(override.aes = aes(label = ""), order = 1)) + theme_bw() + annotate("text", x=-0.4, y=-0.05, label="r = 0.375", size = 3.25, col = 'blue')
 
 dev.off()
 ```
+
+## FIGURE S7: Master heatmap of all deviances 
+
+Dataframes to use:
+`master_devs`: dataframe of deviance point estimates, with non-sigs as zero
+`master_devsOrig`: dataframe of deviance point estimates, with retention of the actual values of non-sigs
+`master_dev_bounds`: dataframe of 95% CIs for the deviances
+`master_pvalues`: dataframe of p-values for the deviances
+`master_summarystats`: dataframe of summary stats for the aggregate periods (Q3 2020 to Q4 2021, and all post-hiatus months)
+
 ```{r}
-cor.test(blindvdf_sp_df[, 'meanAllpost'], blindvdf_sp_df[, '2020-04-01'])
+colnames(master_devs) <- c("Jan 2020", "Feb 2020", "Mar 2020", "Apr 2020", "May 2020", "Jun 2020", "Jul 2020", "Aug 2020", "Sep 2020", "Oct 2020", "Nov 2020", "Dec 2020", "Jan 2021", "Feb 2021", "Mar 2021", "Apr 2021", "May 2021", "Jun 2021", "Jul 2021", "Aug 2021", "Sep 2021", "Oct 2021", "Nov 2021", "Dec 2021")
 ```
 
-## TABLE S1: Select conditions post-hiatus
+```{r}
+col_fun_wtd = colorRamp2(c(-4, 0, 4), c("#de425b", "#eeeeee", "#21a6db"))
+col_fun_wtd(seq(-3, 3))
+```
+
+```{r}
+#remove the 'entity_name' column
+master_devsOrig <- master_devsOrig[, -25] 
+master_devsWeighted <- master_devsWeighted[, -25]
+```
+
+```{r, fig.asp = 3}
+pdf(file="suppl-figs-tables/figure-s7.pdf", width = 12, height = 36)
+
+#draw the heatmap
+masterhm <- Heatmap(as.matrix(master_devsWeighted), 
+                    row_split = icd_df2$catCode,
+                    row_title_rot = 0,
+                    row_title_gp = gpar(fontsize = 14, fontface = "bold"),
+                    row_names_gp = grid::gpar(fontsize = 8),
+                    column_names_gp = grid::gpar(fontsize = 8),
+                    row_gap = unit(2, "mm"),
+                    column_names_rot = 90,
+                    cluster_row_slices = FALSE, 
+                    cluster_columns = F, 
+                    col = col_fun_wtd, 
+                    rect_gp = gpar(col = "dark grey", lwd = 2),
+                    heatmap_legend_param = list(title = "", title_gp = gpar(fontsize = 8, fontface = 'bold'), direction = "horizontal", labels = c(expression(-delta*"*"), "", "", "", expression(+delta*"*"))),
+                    cell_fun = function(j, i, x, y, width, height, fill) {
+                    grid.text(format(as.numeric(sprintf("%.2f", master_devsOrig[i, j])), nsmall = 2), x, y, gp = gpar(fontsize = 8))}
+                    )
+
+ComplexHeatmap::draw(masterhm, heatmap_legend_side = "top") 
+
+dev.off()
+```
+
+## TABLE S5: Select conditions post-hiatus
 
 First, produce a "weighted" version of meanAllpost.
 ```{r}
@@ -1500,7 +1517,6 @@ dfNR_final$recoveryType <- case_when(
 table(dfNR_final$short_name)
 ```
 
-
 ```{r}
 dfNR_final <- dfNR_final %>%
   arrange(meanAllpost) %>%
@@ -1515,7 +1531,7 @@ dfNR_final <- dfNR_final %>%
          x_position = x_min + 0.005,
          pval = ifelse(pvalEmpricialAllpost < 0.001, '< 0.001', pvalEmpricialAllpost)) 
 
-tblS1A <- ggplot(data = dfNR_final) +
+tblS5A <- ggplot(data = dfNR_final) +
   geom_rect(aes(xmin = x_min, xmax = x_max, ymin = y_min, ymax = y_max,
                 fill = short_name), alpha = 0.5,
             color = 'white', size = 0.01) +
@@ -1539,7 +1555,7 @@ tblS1A <- ggplot(data = dfNR_final) +
   theme_void() +
   scale_fill_manual(name = "Diagnosis Category", values = sTables_colors, limits = force)
 
-tblS1A
+tblS5A
 ```
 
 #### S1B: Met or exceeded expectation post-hiatus
@@ -1576,7 +1592,7 @@ dfAE <- dfAE %>%
          x_position = x_min + 0.005,
          pval = ifelse(pvalEmpricialAllpost < 0.001, '< 0.001', pvalEmpricialAllpost)) 
 
-tblS1B <- ggplot(data = dfAE) +
+tblS5B <- ggplot(data = dfAE) +
   geom_rect(aes(xmin = x_min, xmax = x_max, ymin = y_min, ymax = y_max,
                 fill = short_name), alpha = 0.5,
             color = 'white', size = 0.01) +
@@ -1600,27 +1616,28 @@ tblS1B <- ggplot(data = dfAE) +
   theme_void() +
   scale_fill_manual(name = "Diagnosis Category", values = sTables_colors, limits = force)
 
-tblS1B
+tblS5B
 ```
+
 ```{r}
-#to create a common legend, generate a dummy ggplot containing the dx entities in both tblS1A and tblS1B
+#to create a common legend, generate a dummy ggplot containing the dx entities in both tblS5A and tblS5B
 
 dfS1X <- rbind(dfNR_final, dfAE)
 figS1X <- ggplot(dfS1X) + geom_raster(aes(x = meanAllpost, y = RMSPE, fill = short_name), alpha = 0.5) + scale_fill_manual(name = "Diagnosis Category", values = sTables_colors, limits = force) + theme(legend.title = element_text(size = 9, face = 'bold'), legend.text = element_text(size = 7.5))
 figS1X
 ```
 
-
 ```{r}
-pdf(file="/Users/charlesli/Library/CloudStorage/OneDrive-AmericanAcademyofOphthalmology/covid-elasticity-paper/outputs/06072022/suppl-figs/table-s1.pdf", width = 9, height = 8, onefile = FALSE)
+pdf(file="suppl-figs-tables/table-s5.pdf", width = 9, height = 8, onefile = FALSE)
 
-ggarrange(tblS1A, tblS1B, ncol = 1, nrow = 2, labels = c("A", "B"), heights = c(0.65, 0.35), legend = "right", legend.grob = get_legend(figS1X))
+ggarrange(tblS5A, tblS5B, ncol = 1, nrow = 2, labels = c("A", "B"), heights = c(0.65, 0.35), legend = "right", legend.grob = get_legend(figS1X))
 
 dev.off()
 ```
 
-## TABLE S2: Rebounded conditions
+## TABLE S6: Rebounded conditions
 Conditions that exhibited any type of rebound (full or partial): 
+
 ```{r}
 dfAR <- master_summarystats[master_summarystats$recoveredMonth != 'No recovery',  c("entity_name", "short_name", "meanAllpost", "confintAllpost", "pvalEmpricialAllpost", "Allpost", "recoveredMonth", "fullRecovery", "RMSPE")]
 
@@ -1648,7 +1665,7 @@ dfAR <- dfAR %>%
 ```
 
 ```{r}
-tblS2 <- ggplot(data = dfAR) +
+tblS6 <- ggplot(data = dfAR) +
   geom_rect(aes(xmin = x_min, xmax = x_max, ymin = y_min, ymax = y_max,
                 fill = short_name), alpha = 0.5,
             color = 'white', size = 0.01) +
@@ -1673,63 +1690,13 @@ tblS2 <- ggplot(data = dfAR) +
   scale_fill_manual(name = "Diagnosis Category", values = sTables_colors, limits = force) +
   theme(legend.title = element_text(size = 9, face = 'bold'), legend.text = element_text(size = 7.5))
 
-tblS2
-```
-```{r}
-pdf(file="/Users/charlesli/Library/CloudStorage/OneDrive-AmericanAcademyofOphthalmology/covid-elasticity-paper/outputs/06072022/suppl-figs/table-s2.pdf", width = 7.5, height = 12, onefile = FALSE)
-
-ggdraw(tblS2)
-
-dev.off()
-```
-
-## Master heatmap of all deviances (retaining the actual value of nonsigs, and shading based on alpha)
-
-Dataframes to use:
-
-`master_devs`: dataframe of deviance point estimates, with non-sigs as zero
-`master_devsOrig`: dataframe of deviance point estimates, with retention of the actual values of non-sigs
-`master_dev_bounds`: dataframe of 95% CIs for the deviances
-`master_pvalues`: dataframe of p-values for the deviances
-`master_summarystats`: dataframe of summary stats for the aggregate periods (Q3 2020 to Q4 2021, and all post-hiatus months)
-
-
-```{r}
-colnames(master_devs) <- c("Jan 2020", "Feb 2020", "Mar 2020", "Apr 2020", "May 2020", "Jun 2020", "Jul 2020", "Aug 2020", "Sep 2020", "Oct 2020", "Nov 2020", "Dec 2020", "Jan 2021", "Feb 2021", "Mar 2021", "Apr 2021", "May 2021", "Jun 2021", "Jul 2021", "Aug 2021", "Sep 2021", "Oct 2021", "Nov 2021", "Dec 2021")
+tblS6
 ```
 
 ```{r}
-col_fun_wtd = colorRamp2(c(-4, 0, 4), c("#de425b", "#eeeeee", "#21a6db"))
-col_fun_wtd(seq(-3, 3))
-```
+pdf(file="suppl-figs-tables/table-s6.pdf", width = 7.5, height = 12, onefile = FALSE)
 
-```{r}
-#remove the 'entity_name' column
-master_devsOrig <- master_devsOrig[, -25] 
-master_devsWeighted <- master_devsWeighted[, -25]
-```
-
-```{r, fig.asp = 3}
-pdf(file="/Users/charlesli/Library/CloudStorage/OneDrive-AmericanAcademyofOphthalmology/covid-elasticity-paper/outputs/06072022/suppl-figs/figure-s7.pdf", width = 12, height = 36)
-
-#draw the heatmap
-masterhm <- Heatmap(as.matrix(master_devsWeighted), 
-                    row_split = icd_df2$catCode,
-                    row_title_rot = 0,
-                    row_title_gp = gpar(fontsize = 14, fontface = "bold"),
-                    row_names_gp = grid::gpar(fontsize = 8),
-                    column_names_gp = grid::gpar(fontsize = 8),
-                    row_gap = unit(2, "mm"),
-                    column_names_rot = 90,
-                    cluster_row_slices = FALSE, 
-                    cluster_columns = F, 
-                    col = col_fun_wtd, 
-                    rect_gp = gpar(col = "dark grey", lwd = 2),
-                    heatmap_legend_param = list(title = "", title_gp = gpar(fontsize = 8, fontface = 'bold'), direction = "horizontal", labels = c(expression(-delta*"*"), "", "", "", expression(+delta*"*"))),
-                    cell_fun = function(j, i, x, y, width, height, fill) {
-                    grid.text(format(as.numeric(sprintf("%.2f", master_devsOrig[i, j])), nsmall = 2), x, y, gp = gpar(fontsize = 8))}
-                    )
-ComplexHeatmap::draw(masterhm, heatmap_legend_side = "top") 
+ggdraw(tblS6)
 
 dev.off()
 ```
