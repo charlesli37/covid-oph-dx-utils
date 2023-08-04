@@ -1,11 +1,12 @@
 ---
-title: "Static Figures for the COVID Elasticity Paper"
+title: "R Script for _Shifts in Care Utilization Patterns During the COVID-19 Pandemic: A High-Dimensional Study of Presentations for Ophthalmic Conditions in the United States_"
 author: "Charles Li"
 date: "May 4, 2023"
 output: 
 ---
 
 ```{r}
+#import needed packages
 library(ggplot2)
 library(plotly)
 library(ggpubr)
@@ -65,7 +66,7 @@ vehss_idx <- read.csv('codebooks/VT_vs_NVT_Big4_crosswalk.csv')
 vehss_idx$DiagnosisEntity <- stringr::str_trim(vehss_idx$DiagnosisEntity)
 ```
 
-## Elasticity function
+## 'Elasticity' function to estimate deviations from counterfactual expectations
 ```{r}
 elasticities <- function(entity_name, input_df){ #input: name of the dx entity, and master_dx_df
   
