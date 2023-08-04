@@ -1,7 +1,7 @@
 # Elasticities of Care Utilization Patterns During the COVID-19 Pandemic: A High-Dimensional Study of Presentations for Ophthalmic Conditions in the United States
 _Charles Li, Flora Lum, Evan M. Chen, Philip A. Collender, Jennifer R. Head, Rahul N. Khurana, Emmett T. Cunningham Jr., Ramana S. Moorthy, David W. Parke II, Stephen D. McLeod_
 
-*Last updated:* **March XX, 2023** by Charles Li (cli@aao.org), including data up to **December 31, 2021**
+*Last updated:* **May 2, 2023** by Charles Li (cli@aao.org), including data up to **December 31, 2021**
 
 ## About
 
@@ -69,8 +69,9 @@ Monthly numbers of patients documented with each diagnosis entity were queried f
      * `modeling-analysis/dx-entity-codebook-export` folder containing Word document tables (one for each diagnosis category) of the mapping between ICD-10-CM codes and diagnosis entities (converted to PDF format for **Table S1** of the [Supplementary Information]())
      * `modeling-analysis/dx-entity-deviations.csv` estimated deviations from expected utilization levels for each month of the pandemic study period, for the 261 diagnosis entities included in the analysis (visualized in **Figure S7** of the [Supplementary Information]())
      * `modeling-analysis/dx-entity-deviation-bounds.csv` 95% confidence intervals for estimated deviations from expected utilization levels for each month of the pandemic study period, for the 261 diagnosis entities included in the analysis (**Table S8** of the [Supplementary Information]())
-     * `modeling-analysis/dx-entity-deviation-pvalues.csv` p-values for estimated deviations from expected utilization levels for each month of the pandemic study period, for the 261 diagnosis entities included in the analysis (**Table S7** of the [Supplementary Information]())
-     * `modeling-analysis/dx-entity-quarterly-deviations.csv` summary statistics, 95% confidence intervals, and p-values for estimated deviations from expected utilization levels for each quarter of the pandemic study period, for the 261 diagnosis entities included in the analysis
+     * `modeling-analysis/dx-entity-deviation-pvalues.csv` Unadjusted p-values for estimated deviations from expected utilization levels for each month of the pandemic study period, for the 261 diagnosis entities included in the analysis (**Table S7** of the [Supplementary Information]())
+     * `modeling-analysis/dx-entity-deviation-pvalues-adj.csv` Adjusted p-values (via FDR) for estimated deviations from expected utilization levels for each month of the pandemic study period, for the 261 diagnosis entities included in the analysis (**Table S8** of the [Supplementary Information]()) 
+     * `modeling-analysis/dx-entity-quarterly-devs-and-recovery.csv` summary statistics, 95% confidence intervals, p-values (unadjusted and adjusted) for estimated deviations from expected utilization levels for each quarter of the pandemic study period, as well as information on time-to-recovery and recovery status, for the 261 diagnosis entities included in the analysis
     <br/><br/> 
     > **Outputs** (main figures):
      * `main-figures/figure-2.pdf` (**Figure 2** of the [Manuscript]())

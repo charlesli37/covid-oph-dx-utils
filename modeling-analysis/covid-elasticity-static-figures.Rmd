@@ -1,7 +1,7 @@
 ---
 title: "Static Figures for the COVID Elasticity Paper"
 author: "Charles Li"
-date: "March 4, 2022"
+date: "May 4, 2023"
 output: 
 ---
 
@@ -39,7 +39,7 @@ options(scipen=10000)
 
 ```{r setup, include=FALSE, echo=FALSE}
 require("knitr")
-opts_knit$set(root.dir = "/Users/charlesli/Library/CloudStorage/OneDrive-AmericanAcademyofOphthalmology/covid-elasticity-oph")
+opts_knit$set(root.dir = "/Users/charlesli/Library/CloudStorage/OneDrive-AmericanAcademyofOphthalmology/covid-oph-dx-utils")
 ```
 
 ## Data import
@@ -525,8 +525,9 @@ for (i in 1:length(categoryList)){
 
 ## Monthly deviances, their 95% CIs, and p-values
 
-### Deviances (with non-sigs as zero)
+### Deviances (raw estimates)
 ```{r}
+#RAW estimates, i.e., retaining original value of estimates that are not stat. signif. 
 all_devs <- lapply(obj1, '[[', 9) 
 
 obj2_df <- as.data.frame(do.call(rbind, all_devs))
@@ -535,20 +536,6 @@ obj3_p <- reshape2::dcast(obj2_df, dx_name ~ date, value.var="pred_signif")
 obj3_mat <- as.matrix(obj3[, -1])
 rownames(obj3_mat) <- obj3[, 1]
 
-#account for p > 0.05
-obj3_p_mat <- as.matrix(obj3_p[, -1])
-rownames(obj3_p_mat) <- obj3_p[, 1]
-
-#convert to 1's and 0's:
-obj3_p_mat_bin <- apply(obj3_p_mat, c(1,2), function(x) ifelse(x == "*", 1, 0))
-obj3_mat2 <- as.data.frame(obj3_mat * obj3_p_mat_bin)
-
-#keep only diagnoses with accurate enough RMSPEs
-master_devs <- obj3_mat2[rownames(obj3_mat2) %in% accurate_dx_list, ]
-```
-
-### Deviances (RAW, i.e., retaining original value of non-sigs)
-```{r}
 #keep only diagnoses with accurate enough RMSPEs
 master_devsOrig <- as.data.frame(obj3_mat[rownames(obj3_mat) %in% accurate_dx_list, ])
 ```
@@ -573,7 +560,7 @@ master_dev_bounds <- as.data.frame(obj3_mat_dev[rownames(obj3_mat_dev) %in% accu
 write.csv(master_dev_bounds, 'modeling-analysis/dx-entity-deviation-bounds.csv')
 ```
 
-### P-values
+### Unadjusted p-values
 ```{r}
 all_pvalues <- lapply(obj1, '[[', 14) 
 obj2_df_pval <- as.data.frame(do.call(rbind, all_pvalues))
@@ -589,14 +576,34 @@ master_pvalues <- as.data.frame(obj3_mat_pval[rownames(obj3_mat_pval) %in% accur
 write.csv(master_pvalues, 'modeling-analysis/dx-entity-deviation-pvalues.csv')
 ```
 
+### Adjusted p-values
+```{r}
+#apply FDR correction to p-values to adjust for multiple comparisons within each dx entity
+master_pvaluesAdj <- data.frame(t(apply(master_pvalues, 1, p.adjust, method = "fdr")))
+colnames(master_pvaluesAdj) <- c("Jan 2020", "Feb 2020", "Mar 2020", "Apr 2020", "May 2020", "Jun 2020", "Jul 2020", "Aug 2020", "Sep 2020", "Oct 2020", "Nov 2020", "Dec 2020", "Jan 2021", "Feb 2021", "Mar 2021", "Apr 2021", "May 2021", "Jun 2021", "Jul 2021", "Aug 2021", "Sep 2021", "Oct 2021", "Nov 2021", "Dec 2021")
+```
+
+```{r}
+write.csv(master_pvaluesAdj, 'modeling-analysis/dx-entity-deviation-pvalues-adj.csv')
+```
+
 ### Weighted deviances for heatmap shading
 ```{r}
-master_devsWeighted <- -log(master_pvalues) * master_devsOrig
+master_devsWeighted <- -log(master_pvaluesAdj) * master_devsOrig
 colnames(master_devsWeighted) <- c("Jan 2020", "Feb 2020", "Mar 2020", "Apr 2020", "May 2020", "Jun 2020", "Jul 2020", "Aug 2020", "Sep 2020", "Oct 2020", "Nov 2020", "Dec 2020", "Jan 2021", "Feb 2021", "Mar 2021", "Apr 2021", "May 2021", "Jun 2021", "Jul 2021", "Aug 2021", "Sep 2021", "Oct 2021", "Nov 2021", "Dec 2021")
 ```
 
-## Summary stats for aggregate periods
+### Deviances (non-sigs as zero)
+```{r}
+#create new dataframe of deviance point estimates, with non-sigs as zero, using the adjusted p-values
+#specifically: if the adjusted p-value is > 0.05 for a deviance point estimate, replace the value of the estimate with "zero"
+#will need this dataframe to define the time-to-recovery (TTR) secondary outcome
 
+master_pvaluesAdjBin <- apply(master_pvaluesAdj, c(1,2), function(x) return(ifelse(x < 0.05, 1, 0))) #binary matrix: 1 if the adj p-value < 0.05, 0 otherwise
+master_devs <- master_devsOrig * master_pvaluesAdjBin
+```
+
+## Summary stats for aggregate periods
 ```{r}
 all_summarystats <- lapply(obj1, '[[', 16) 
 obj2_summstats <- lapply(1:length(all_summarystats), function(m){all_summarystats[[m]]$summaryDeviations})
@@ -781,7 +788,7 @@ fig2 <- ggarrange(fig2a + rremove("axis.title"), fig2b + rremove("axis.title"), 
 annotate_figure(fig2, left = text_grob("Number of patients", rot = 90, size = 10), bottom = text_grob("Month of diagnosis documentation", size = 10))
 ```
 
-### 1E: Heatmap of non-severe Big 4 eye conditions  
+### 2E: Heatmap of non-severe Big 4 eye conditions  
 
 ```{r}
 col_fun_fig2e = colorRamp2(c(-4, 0, 4), c("#de425b", "#eeeeee", "#21a6db"))
@@ -1038,21 +1045,27 @@ dev.off()
 ## FIGURE 6
 
 ### Time to recovery
-
 ```{r}
-ttr_func <- function(entity_name, input_df){
+ttr_func <- function(entity_name, input_df){ #inputs: name of the dx entity, and the master_devs df
   
-  df <- input_df[rownames(input_df) == entity_name, ]
-  df_long <- df %>% gather(timepoint)
-  df_long <- df_long[df_long$value >= 0, ]
-  tp_indicies <- as.numeric(rownames(df_long[df_long$value >= 0, ]))
-  tp_indicies <- tp_indicies[tp_indicies > 5]
+  df <- input_df[rownames(input_df) == entity_name, ] #extract the row of the master_devs df for the dx entity
+  df_long <- df %>% gather(timepoint) #wide to long format: three cols now: `entity_name`, `timepoint`, `value` (deviation)
+  df_long <- df_long[df_long$value >= 0, ] #only keep timepoints where `value` is >= 0
+  tp_indicies <- as.numeric(rownames(df_long[df_long$value >= 0, ])) #extract the study month number(s)
+  tp_indicies <- tp_indicies[tp_indicies > 5] #only consider June 2020 and afterwards
   
-  res_df <- as.data.frame(seqToIntervals(tp_indicies))
+  #only keep contiguous intervals of recovery (among the study month numbers) greater than or equal to 3 
+  res_df <- as.data.frame(seqToIntervals(tp_indicies)) #return contiguous intervals for a vector of indicies
   res_df$diff <-  res_df$to - res_df$from + 1
   res_df <- res_df[res_df$diff >= 3, ]
+  
+  #the earliest month in which the `value` reaches 0 (i.e., the entity recovers) is stored in `recovered_month`; if there are no such intervals in `res_df`, then 'No recovery' is stored in `recovered_month`
   recovered_month <- ifelse(nrow(res_df) == 0, 'No recovery', head(res_df[res_df$diff >= 3, 'from'], 1))
 
+  #determine full vs. partial recovery
+  ##(1) does `res_df` have at least one row
+  ##(2) is there only one interval in `res_df`, and does it have the same start and end time?
+  ##(3) does this interval in `res_df` end at pandemic study month #24 (i.e., Dec 2021)?
   if(nrow(res_df) != 0 && (head(res_df[, 'from'], 1) == tail(head(res_df[, 'from'], 1))) && (tail(head(res_df[, 'to'], 1) == 24))){
     fullRecovery <- TRUE
   }
@@ -1060,8 +1073,9 @@ ttr_func <- function(entity_name, input_df){
     fullRecovery <- FALSE
   }
   
+  #return the `recovered_month` and a boolean value indicating whether the recovery was full or partial
   res <- list(recovered_month, fullRecovery)
-  return(res)
+  return(res) 
   
 }
 ```
@@ -1074,8 +1088,43 @@ master_summarystats$fullRecovery <- unlist(lapply(lapply(as.list(master_summarys
 master_summarystats$recoveredMonthNum <- ifelse(master_summarystats$recoveredMonth == 'No recovery', 0, as.numeric(master_summarystats$recoveredMonth))
 ```
 
-### Circos plot
+```{r}
+#quality check
+sum(is.na(master_summarystats$recoveredMonthNum)) #0
+sum(is.na(master_summarystats$fullRecovery)) #0
+sum(is.na(master_summarystats$recoveredMonth)) #0
+```
 
+### Adjusted p-values for quarterly deviations
+```{r}
+quarterly_pvals <- master_summarystats[, c('pvalEmpricialQ32020', 'pvalEmpricialQ42020', 'pvalEmpricialQ12021', 'pvalEmpricialQ22021', 'pvalEmpricialQ32021', 'pvalEmpricialQ42021')]
+rownames(quarterly_pvals) <- master_summarystats$entity_name
+colnames(quarterly_pvals) <- c('unadj.pval_Q32020', 'unadj.pval_Q42020', 'unadj.pval_Q12021', 'unadj.pval_Q22021', 'unadj.pval_Q32021', 'unadj.pval_Q42021')
+quarterly_adjpvals <- as.data.frame(t(apply(quarterly_pvals, 1, p.adjust, method = "fdr")))
+colnames(quarterly_adjpvals) <- c('adj.pval_Q32020', 'adj.pval_Q42020', 'adj.pval_Q12021', 'adj.pval_Q22021', 'adj.pval_Q32021', 'adj.pval_Q42021')
+quarterly_adjpvals$entity_name <- rownames(quarterly_adjpvals)
+master_summarystats <- merge(master_summarystats, quarterly_adjpvals, by = 'entity_name')
+
+master_summarystats$Q32020w_adj <- master_summarystats$meanQ32020 * -log(master_summarystats$adj.pval_Q32020)
+master_summarystats$Q42020w_adj <- master_summarystats$meanQ42020 * -log(master_summarystats$adj.pval_Q42020)
+master_summarystats$Q12021w_adj <- master_summarystats$meanQ12021 * -log(master_summarystats$adj.pval_Q12021)
+master_summarystats$Q22021w_adj <- master_summarystats$meanQ22021 * -log(master_summarystats$adj.pval_Q22021)
+master_summarystats$Q32021w_adj <- master_summarystats$meanQ32021 * -log(master_summarystats$adj.pval_Q32021)
+master_summarystats$Q42021w_adj <- master_summarystats$meanQ42021 * -log(master_summarystats$adj.pval_Q42021)
+```
+
+```{r}
+write.csv(master_summarystats, 'modeling-analysis/dx-entity-quarterly-devs-and-recovery.csv')
+```
+
+```{r}
+#for circos ordering
+master_summarystats$short_name <- as.factor(master_summarystats$short_name)
+View(master_summarystats[, c("Q32020w", "Q32020w_adj", "Q42020w", "Q42020w_adj", "Q12021w", "Q12021w_adj", "Q22021w", "Q22021w_adj", "Q32021w", "Q32021w_adj", "Q42021w", "Q42021w_adj")])
+```
+
+
+### Circos plot
 ```{r}
 circos.clear()
 
@@ -1089,7 +1138,7 @@ circos.par("start.degree" = 90, #the starting degree where the first sector is p
            gap.after = c(rep(2, 12), 10))
 
 #2. allocate sectors on the circle
-circos.heatmap.initialize(master_summarystats[, rev(c("Q32020w", "Q42020w", "Q12021w", "Q22021w", "Q32021w", "Q42021w"))], split = master_summarystats$short_name)
+circos.heatmap.initialize(master_summarystats[, rev(c("Q32020w_adj", "Q42020w_adj", "Q12021w_adj", "Q22021w_adj", "Q32021w_adj", "Q42021w_adj"))], split = master_summarystats$short_name)
 
 #3. create plotting regions for cells, starting from outermost to innermost tracks:
 
@@ -1111,7 +1160,7 @@ circos.track(ylim = c(0, 0.125),
 set_track_gap(cm_h(0.25))
 
 ## TRACK 2: heatmaps of quarterly deviations post-hiatus (weighted by alpha)
-circos.heatmap(master_summarystats[, rev(c("Q32020w", "Q42020w", "Q12021w", "Q22021w", "Q32021w", "Q42021w"))], 
+circos.heatmap(master_summarystats[, rev(c("Q32020w_adj", "Q42020w_adj", "Q12021w_adj", "Q22021w_adj", "Q32021w_adj", "Q42021w_adj"))], 
                col = colorRamp2(c(-4, 0, 4), c("#de425b", "#eeeeee", "#21a6db")), 
                show.sector.labels = FALSE,
                cluster = TRUE)
@@ -1491,17 +1540,18 @@ Then, set a custom color scale for the following diagnosis categories:
 
 ```{r}
 sTables_colors <- c('#a6cee3', '#1f78b4', '#b2df8a', '#33a02c', '#fb9a99', '#e31a1c', '#fdbf6f', '#ff7f00', '#cab2d6', 'grey', '#6a3d9a', '#ffff99', '#b15928')
-names(sTables_colors) <- unique(master_summarystats$short_name)
+names(sTables_colors) <- sort(unique(master_summarystats$short_name))
 #sTables_colorscale <- scale_fill_manual(name = "Diagnosis Category", values = sTables_colors)
 ```
 
-#### S1A: Suppression post-hiatus
-Conditions that have the most suppressed post-hiatus utilization (mean deviation ≤ 20%).
+#### S5A: Suppression post-hiatus
 
+Conditions that have the most suppressed post-hiatus utilization (mean deviation ≤ 20%).
 ```{r}
+#first subset all conditions with a post-hiatus deviation < 0 with statistical significance
 dfNR <- master_summarystats[master_summarystats$Allpost < 0 & master_summarystats$pvalEmpricialAllpost < 0.05, c("entity_name", "short_name", "meanAllpost", "confintAllpost", "pvalEmpricialAllpost", "Allpost", "recoveredMonth", "fullRecovery", "RMSPE")]
 
-#only include all conditions whose post-pandemic deviation <= -0.20 and do not have any recovery
+#only include all conditions with a post-hiatus deviation <= -0.20
 dfNR_final <- dfNR[(dfNR$meanAllpost <= -0.20), ]
 dfNR_final$meanAllpost <- sprintf("%.3f", round(dfNR_final$meanAllpost, 3))
 dfNR_final$RMSPE <- sprintf("%.3f", round(dfNR_final$RMSPE, 3))
@@ -1511,10 +1561,6 @@ dfNR_final$recoveryType <- case_when(
   dfNR_final$recoveredMonth != 'No recovery' & dfNR_final$fullRecovery == TRUE ~ 'Full',
   TRUE ~ 'Partial'
 )
-```
-
-```{r}
-table(dfNR_final$short_name)
 ```
 
 ```{r}
@@ -1558,9 +1604,8 @@ tblS5A <- ggplot(data = dfNR_final) +
 tblS5A
 ```
 
-#### S1B: Met or exceeded expectation post-hiatus
-Conditions that met or exceed counterfactual expectation in the post-hiatus period (mean deviation ≥ 0%). 
-
+#### S5B: Met or exceeded expectation post-hiatus
+Conditions that met or exceed counterfactual expectation in the post-hiatus period (mean deviation > 0%, with no restriction on statistical significance) 
 ```{r}
 dfAE <- master_summarystats[master_summarystats$meanAllpost > 0,  c("entity_name", "short_name", "meanAllpost", "confintAllpost", "pvalEmpricialAllpost", "Allpost", "recoveredMonth", "fullRecovery", "RMSPE")]
 
@@ -1572,10 +1617,6 @@ dfAE$recoveryType <- case_when(
   dfAE$recoveredMonth != 'No recovery' & dfAE$fullRecovery == TRUE ~ 'Full',
   TRUE ~ 'Partial'
 )
-```
-
-```{r}
-table(dfAE$short_name)
 ```
 
 ```{r}
@@ -1636,7 +1677,7 @@ dev.off()
 ```
 
 ## TABLE S6: Rebounded conditions
-Conditions that exhibited any type of rebound (full or partial): 
+Conditions that exhibited any type of recovery (full or partial): 
 
 ```{r}
 dfAR <- master_summarystats[master_summarystats$recoveredMonth != 'No recovery',  c("entity_name", "short_name", "meanAllpost", "confintAllpost", "pvalEmpricialAllpost", "Allpost", "recoveredMonth", "fullRecovery", "RMSPE")]
@@ -1694,9 +1735,76 @@ tblS6
 ```
 
 ```{r}
-pdf(file="suppl-figs-tables/table-s6.pdf", width = 7.5, height = 12, onefile = FALSE)
+pdf(file="suppl-figs-tables/table-s6.pdf", width = 8, height = 12, onefile = FALSE)
 
 ggdraw(tblS6)
 
 dev.off()
 ```
+
+# Additional analyses of TTR
+Deeper explorations of the time-to-recovery secondary outcome
+Dataframes to use:
+- `dfNR_final` (Table S5A): dx entities with the most suppressed post-hiatus utilization (mean deviation ≤ 20%, with p ≤ 0.05)
+- `dfAE` (Table S5A): dx entities that met or exceeded counterfactual expectation in the post-hiatus period (mean deviation > 0%, with no restriction on statistical significance) 
+- `dfAR` (Table S6): dx entities that exhibited any type of recovery (full or partial)
+
+```{r}
+nrow(dfNR_final) #33
+nrow(dfAE) #15
+nrow(dfAR) #116
+```
+
+## Diagnosis categories represented in Table S5A
+```{r}
+sort(table(dfNR_final$short_name), decreasing = T)
+```
+> Most represented diagnosis categories among the conditions that experienced the most severe suppressions to care utilization included diagnoses related to corneal/external disease (12/33 = 36.4%), retina/vitreous (7/33 = 21.2%), oculoplastics (6/33 = 18.2%), and blindness and vision defects (4/33 = 12.1%). 
+
+> No conditions in Table S5A experienced any recovery, with the exception of the "eyelid/periocular superficial injury", which experienced only partial recovery in Nov 2020. 
+
+## Diagnosis categories represented in Table S5B
+```{r}
+sort(table(dfAE$short_name), decreasing = T)
+```
+> Most represented diagnosis categories among the conditions that experienced met or exceeded expectation included diagnoses related to retina/vitreous (7/15 = 46.7%) and corneal/external disease (3/15 = 20%).
+
+```{r}
+table(dfAE$recoveryType)
+table(dfAE$recoveredMonthNum)
+```
+> All conditions in Table S5B experienced full or partial recovery, with the majority experiencing full recovery (12/15 = 80%). Among these conditions, the most common month at which recovery was reached was June 2020 (i.e., time-to-recovery = 6 months since the start of the pandemic study period in Jan 2020).
+
+## Diagnosis categories represented in Table S6
+```{r}
+sort(table(dfAR$short_name), decreasing = T)
+```
+> Most represented diagnosis categories among the conditions in Table S6 included diagnoses related to retina/vitreous (28/116 = 24.1%), corneal/external disease (22/116 = 19.0%), oculoplastics (15/116 = 12.9%), and uveitis (12/116 = 10.3%).
+
+```{r}
+table(dfAR$recoveryType)
+sort(table(dfAR$recoveredMonthNum), decreasing = T)
+```
+> Among the 116 conditions that experienced any form of recovery, roughly half of these conditions (56.9%) only experienced partial recovery. 
+
+> The most common post-hiatus month at which conditions experienced recovery was June 2020 (42/116 = 36.2%), followed by September 2020 (17/116  = 14.7%), December 2020 (14/116 = 12.1%), June 2021 (14/116 = 12.1%), and February 2021 (13/116 = 11.2%).
+
+```{r}
+#considering adding this as a "Table S6B"?
+tbls6_summary <- as.data.frame(table(dfAR$short_name, dfAR$recoveryType))
+tbls6_summary <- reshape(tbls6_summary, idvar = "Var1", timevar = "Var2", direction = "wide")
+colnames(tbls6_summary) <- c("dx_category", "Full", "Partial")
+tbls6_summary$pct_fr <- tbls6_summary$Full/(tbls6_summary$Full+tbls6_summary$Partial)
+tbls6_summary$total <- tbls6_summary$Full+tbls6_summary$Partial
+tbls6_summary <- merge(tbls6_summary, table(master_summarystats$short_name), by.x = 'dx_category', by.y = 'Var1')
+colnames(tbls6_summary)[6] <- 'total_dx_entities'
+tbls6_summary$total_pct_rec <- tbls6_summary$total/tbls6_summary$total_dx_entities
+```
+
+> In terms of absolute numbers of conditions experiencing recovery, the highest were diagnoses of the retina/vitreous (28 recovered conditions; 12 full, 16 partial) and cornea/external diseases (22 recovered conditions; 6 full, 16 partial), followed by oculoplastics (15 recovered conditions; 8 full, 7 partial) and uveitis (12 recovered conditions; 5 full, 7 partial).
+
+> However, relative to the total number of conditions captured in each diagnosis category, the diagnosis categories with the highest proportions of recovered conditions were uveitis and ocular inflammation (12/15 = 80%), post-operative complications (4/5 = 80%), ocular globe injuries and intraocular foreign bodies (3/4 = 75%), and cataract and other lens disorders (5/7 = 71%). 
+
+> The diagnosis categories that exhibited the lowest proportions of recovery included the category of "other specified eye disorders" (2/13 = 15.4%), followed by refractive error (2/7 = 29%), retinal and vitreous conditions (28/75 = 37%), blindness and vision defects (5/13 = 38%), and cornea and external disease (22/56 = 39%). 
+
+> Nearly or precisely half of all conditions experienced recovery in the diagnosis categories of oculofacial plastics and orbital conditions (15/29 = 51.7%), neuro-ophthalmology (8/16 = 50%), strabismus (3/6 = 50%), glaucoma (7/15 = 47%).  
