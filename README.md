@@ -1,10 +1,13 @@
 # Shifts in Care Utilization Patterns During the COVID-19 Pandemic: A High-Dimensional Study of Presentations for Ophthalmic Conditions in the United States
 _Charles Li, Flora Lum, Evan M. Chen, Philip A. Collender, Jennifer R. Head, Rahul N. Khurana, Emmett T. Cunningham Jr., Ramana S. Moorthy, David W. Parke II, Stephen D. McLeod_
 
-*Last updated:* **August 4, 2023** by Charles Li (cli@aao.org), including data up to **December 31, 2021**
+*Last updated:* **August 6, 2023** by Charles Li (cli@aao.org), including data up to **December 31, 2021**
 
 ## About
 
+This repository hosts the code, outputs, and supplementary information for a study focused on understanding the disruptions to ophthalmic care in the United States for the first two years of the COVID-19 pandemic. During the pandemic, ophthalmology was significantly affected by restrictions to healthcare provision. Using data from the [American Academy of Ophthalmology IRIS:registered: Registry (Intelligent Research in Sight)](https://www.aao.org/iris-registry), this research characterized patterns of eye care utilization across 261 different ocular conditions from January 2020 to December 2021 by leveraging a common analytical framework to explore factors that may explain the differential underutilization of care. 
+
+In the acute phase of the pandemic, redistributions of healthcare resources were required to minimize mortality and limit the spread of COVID-19. However, the patterns of, and reasons explaining, sustained utilization reductions in the post-acute phase are not entirely understood. Existing research by health economists have estimated the "elasticity" (i.e., responsiveness) of demand of healthcare services in response to changes in another variable (e.g., cost income); similarly, we explored how utilization levels for a wide range of ocular diagnoses exhibited varying degrees of sensitivity to possible pandemic-related resource constraints or behavioral modifications. We specifically examined whether features of diagnoses themselves--namely, disease severity--could explain the differential underutilization of ophthalmic care during the COVID-19 pandemic. 
 
 ## Data Processing and Analytic Steps
 
@@ -14,7 +17,7 @@ This project consists of the following main stages:
 
 ### Step 1A. Construct an inventory of ophthalmic diagnoses to study
 
-1. We first specified an inventory of conditions ("diagnosis entities") to include for analysis using the spreadsheet file `codebooks/source materials/CCSR ICD10 5.4.20_modified.xlsx`, adapted from [v2020.2](https://www.hcup-us.ahrq.gov/toolssoftware/ccsr/v2020_2.zip) of the U.S. Agency for Healthcare Research and Quality [Clinicial Classifications Software Refined (CCSR) database](https://www.hcup-us.ahrq.gov/toolssoftware/ccsr/ccs_refined.jsp#overdiagnoses). The CCSR aggregates tens of thousands of International Classification of Diseases, Tenth Revision, Clinical Modification (ICD-10-CM) diagnosis codes into [clinically meaningful groupings](https://www.hcup-us.ahrq.gov/toolssoftware/ccsr/DXCCSR-User-Guide-v2023-1.pdf), which are called "diagnosis entities" in this study. Only the "EYE" chapter of the CCSR, which encompasses ICD-10-CM codes related to diseases of the eye and adnexa, was considered for this analysis. 
+1. We first specified an inventory of conditions ("diagnosis entities") to include for analysis using the spreadsheet file `codebooks/source materials/CCSR ICD10 5.4.20_modified.xlsx`, adapted from [v2020.2](https://www.hcup-us.ahrq.gov/toolssoftware/ccsr/v2020_2.zip) of the U.S. Agency for Healthcare Research and Quality [Clinicial Classifications Software Refined (CCSR) database](https://www.hcup-us.ahrq.gov/toolssoftware/ccsr/ccs_refined.jsp#overdiagnoses). The CCSR aggregates tens of thousands of International Classification of Diseases, Tenth Revision, Clinical Modification (ICD-10-CM) diagnosis codes into [clinically meaningful groupings](https://www.hcup-us.ahrq.gov/toolssoftware/ccsr/DXCCSR-User-Guide-v2023-1.pdf), which are called "diagnosis entities" in this study. We mainly considered codes from the "EYE" chapter of the CCSR, which encompasses ICD-10-CM codes related to diseases of the eye and adnexa, for this study. 
 
     `CCSR ICD10 5.4.20_modified.xlsx` contains two tabs:
     
