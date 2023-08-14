@@ -21,7 +21,7 @@ This project consists of the following main stages:
 
     `CCSR ICD10 5.4.20_modified.xlsx` contains two tabs:
     
-    * The first tab is a spreadsheet that maps each ICD-10-CM diagnosis code (`ICD-10 Code`) to a diagnosis entity (`DiagnosisEntity`). Each distinct ICD-10-CM code is listed once (on a single row), with the ICD-10-CM description of the diagnosis code (`Diagnosis`), the diagnosis entity that the ICD-10-CM code belongs to (`DiagnosisEntity`), and the broader diagnosis category that the diagnosis entity belongs to (`CCSR Category`), in abbreviation form (EYE0XX), listed across the columns of the spreadsheet. Unlike the original CCSR mapping, which allowed for some ICD-10-CM codes to be cross-classified into more than one category, we adopted a mutually exclusive categorization scheme by assigning each diagnosis entity to one of 13 diagnosis categories (EYE001 - EYE013). Furthermore, an ICD-10-CM diagnosis code with incomplete time series (TS) data of monthly counts of patients observed with that condition and/or very low monthly case counts was excluded from consideration in this study if it was not feasible to assign the code into an existing or new (standalone) diagnosis entity in a clinically meaningful way. For ICD-10-CM codes that are not assigned to any diagnosis entity, `CODE EXCLUDED` was written in the `DiagnosisEntity` column. **Text S4** of the [Supplementary Information]() contains further details on the assignment of ICD-10-CM codes to diagnosis entities and other adaptations made from the original groupings provided by the CCSR database.
+    * The first tab is a spreadsheet that maps each ICD-10-CM diagnosis code (`ICD-10 Code`) to a diagnosis entity (`DiagnosisEntity`). Each distinct ICD-10-CM code is listed once (on a single row), with the ICD-10-CM description of the diagnosis code (`Diagnosis`), the diagnosis entity that the ICD-10-CM code belongs to (`DiagnosisEntity`), and the broader diagnosis category that the diagnosis entity belongs to (`CCSR Category`), in abbreviation form (EYE0XX), listed across the columns of the spreadsheet. Unlike the original CCSR mapping, which allowed for some ICD-10-CM codes to be cross-classified into more than one category, we adopted a mutually exclusive categorization scheme by assigning each diagnosis entity to one of 13 diagnosis categories (EYE001 - EYE013). Furthermore, an ICD-10-CM diagnosis code with incomplete time series (TS) data of monthly counts of patients observed with that condition and/or very low monthly case counts was excluded from consideration in this study if it was not feasible to assign the code into an existing or new (standalone) diagnosis entity in a clinically meaningful way. For ICD-10-CM codes that are not assigned to any diagnosis entity, `CODE EXCLUDED` was written in the `DiagnosisEntity` column. **Text S4** of the [Supplementary Information](https://assets.researchsquare.com/files/rs-1950480/v1/0ef0da513e6e0dd67200a2dc.pdf) contains further details on the assignment of ICD-10-CM codes to diagnosis entities and other adaptations made from the original groupings provided by the CCSR database.
 
     * The second tab includes a list the full names of the diagnosis categories and their abbreviations (EYE0XX).
 
@@ -40,7 +40,7 @@ This project consists of the following main stages:
 
 ### Step 1B. Extract monthly counts of patients observed with each diagnosis
 
-Monthly numbers of patients documented with each diagnosis entity were queried from the IRIS Registry (Amazon Redshift version 1.0.38698, PostgreSQL 8.0.2). The SQL script `data-extraction/covid19_alldx_pull.sql`, as well as the **Methods** section of the [Manuscript](), details the steps undertaken for data extraction, including the criteria we applied to identify diagnosis records and patients eligible for inclusion in this analysis. The final output of this script is a single table that contains the numbers of patients documented with each diagnosis entity for each month of the study period (January 2017 to Decemeber 2021). 
+Monthly numbers of patients documented with each diagnosis entity were queried from the IRIS Registry (Amazon Redshift version 1.0.38698, PostgreSQL 8.0.2). The SQL script `data-extraction/covid19_alldx_pull.sql`, as well as the **Methods** section of the [Manuscript](https://www.researchsquare.com/article/rs-1950480/v1), details the steps undertaken for data extraction, including the criteria we applied to identify diagnosis records and patients eligible for inclusion in this analysis. The final output of this script is a single table that contains the numbers of patients documented with each diagnosis entity for each month of the study period (January 2017 to Decemeber 2021). 
 
 > **Input**:\
  `codebooks/ccsr_codebook_for_sql.csv`\
@@ -64,32 +64,32 @@ Monthly numbers of patients documented with each diagnosis entity were queried f
      * `data-extraction/dx_proportions_and_cnts.csv`
      * `codebooks/ccsr_codebook_for_sql.csv`
      * `codebooks/source materials/CCSR ICD10 categories 5.4.20_modified.csv`
-     * `codebooks/base_score_modified.csv` mapping of diagnosis entities in this study to the ocular emergencies surveyed in the [BAsic SEverity Score for Common OculaR Emergencies (BaSe SCOrE) study](https://pubmed.ncbi.nlm.nih.gov/26294965/) by Bourges et al. (**Table S3** of the [Supplementary Information]())
-     * `codebooks/VT_vs_NVT_Big4_crosswalk.csv` classification of diagnosis entities related to diabetic retinopathy, age-related macular degeneration, and glaucoma as vision-threatening vs. not vision-threatening (**Table S4** of the [Supplementary Information]())
+     * `codebooks/base_score_modified.csv` mapping of diagnosis entities in this study to the ocular emergencies surveyed in the [BAsic SEverity Score for Common OculaR Emergencies (BaSe SCOrE) study](https://pubmed.ncbi.nlm.nih.gov/26294965/) by Bourges et al. (**Table S3** of the [Supplementary Information](https://assets.researchsquare.com/files/rs-1950480/v1/0ef0da513e6e0dd67200a2dc.pdf))
+     * `codebooks/VT_vs_NVT_Big4_crosswalk.csv` classification of diagnosis entities related to diabetic retinopathy, age-related macular degeneration, and glaucoma as vision-threatening vs. not vision-threatening (**Table S4** of the [Supplementary Information](https://assets.researchsquare.com/files/rs-1950480/v1/0ef0da513e6e0dd67200a2dc.pdf))
     <br/><br/>
     > **Outputs** (supplementary data):
-     * `modeling-analysis/dx-entity-models-summstats.csv` summary statistics and counterfactual model performance metrics for all 336 diagnosis entities considered for inclusion in the analysis (**Table S2** of the [Supplementary Information]())
-     * `modeling-analysis/dx-entity-codebook-export` folder containing Word document tables (one for each diagnosis category) of the mapping between ICD-10-CM codes and diagnosis entities (converted to PDF format for **Table S1** of the [Supplementary Information]())
-     * `modeling-analysis/dx-entity-deviations.csv` estimated deviations from expected utilization levels for each month of the pandemic study period, for the 261 diagnosis entities included in the analysis (visualized in **Figure S7** of the [Supplementary Information]())
-     * `modeling-analysis/dx-entity-deviation-bounds.csv` 95% confidence intervals for estimated deviations from expected utilization levels for each month of the pandemic study period, for the 261 diagnosis entities included in the analysis (**Table S9** of the [Supplementary Information]())
-     * `modeling-analysis/dx-entity-deviation-pvalues.csv` Unadjusted p-values for estimated deviations from expected utilization levels for each month of the pandemic study period, for the 261 diagnosis entities included in the analysis (**Table S7** of the [Supplementary Information]())
-     * `modeling-analysis/dx-entity-deviation-pvalues-adj.csv` Adjusted p-values (via FDR) for estimated deviations from expected utilization levels for each month of the pandemic study period, for the 261 diagnosis entities included in the analysis (**Table S8** of the [Supplementary Information]()) 
+     * `modeling-analysis/dx-entity-models-summstats.csv` summary statistics and counterfactual model performance metrics for all 336 diagnosis entities considered for inclusion in the analysis (**Table S2** of the [Supplementary Information](https://assets.researchsquare.com/files/rs-1950480/v1/0ef0da513e6e0dd67200a2dc.pdf))
+     * `modeling-analysis/dx-entity-codebook-export` folder containing Word document tables (one for each diagnosis category) of the mapping between ICD-10-CM codes and diagnosis entities (converted to PDF format for **Table S1** of the [Supplementary Information](https://assets.researchsquare.com/files/rs-1950480/v1/0ef0da513e6e0dd67200a2dc.pdf))
+     * `modeling-analysis/dx-entity-deviations.csv` estimated deviations from expected utilization levels for each month of the pandemic study period, for the 261 diagnosis entities included in the analysis (visualized in **Figure S7** of the [Supplementary Information](https://assets.researchsquare.com/files/rs-1950480/v1/0ef0da513e6e0dd67200a2dc.pdf))
+     * `modeling-analysis/dx-entity-deviation-bounds.csv` 95% confidence intervals for estimated deviations from expected utilization levels for each month of the pandemic study period, for the 261 diagnosis entities included in the analysis (**Table S9** of the [Supplementary Information](https://assets.researchsquare.com/files/rs-1950480/v1/0ef0da513e6e0dd67200a2dc.pdf))
+     * `modeling-analysis/dx-entity-deviation-pvalues.csv` Unadjusted p-values for estimated deviations from expected utilization levels for each month of the pandemic study period, for the 261 diagnosis entities included in the analysis (**Table S7** of the [Supplementary Information](https://assets.researchsquare.com/files/rs-1950480/v1/0ef0da513e6e0dd67200a2dc.pdf))
+     * `modeling-analysis/dx-entity-deviation-pvalues-adj.csv` Adjusted p-values (via FDR) for estimated deviations from expected utilization levels for each month of the pandemic study period, for the 261 diagnosis entities included in the analysis (**Table S8** of the [Supplementary Information](https://assets.researchsquare.com/files/rs-1950480/v1/0ef0da513e6e0dd67200a2dc.pdf)) 
      * `modeling-analysis/dx-entity-quarterly-devs-and-recovery.csv` summary statistics, 95% confidence intervals, p-values (unadjusted and adjusted) for estimated deviations from expected utilization levels for each quarter of the pandemic study period, as well as information on time-to-recovery and recovery status, for the 261 diagnosis entities included in the analysis
     <br/><br/> 
     > **Outputs** (main figures):
-     * `main-figures/figure-2.pdf` (**Figure 2** of the [Manuscript]())
-     * `main-figures/figure-3.pdf` (**Figure 3** of the [Manuscript]())
-     * `main-figures/figure-4.pdf` (**Figure 4** of the [Manuscript]())
-     * `main-figures/figure-5.pdf` (**Figure 5** of the [Manuscript]())
-     * `main-figures/figure-6.pdf` (**Figure 6** of the [Manuscript]())
+     * `main-figures/figure-2.pdf` (**Figure 2** of the [Manuscript](https://www.researchsquare.com/article/rs-1950480/v1))
+     * `main-figures/figure-3.pdf` (**Figure 3** of the [Manuscript](https://www.researchsquare.com/article/rs-1950480/v1))
+     * `main-figures/figure-4.pdf` (**Figure 4** of the [Manuscript](https://www.researchsquare.com/article/rs-1950480/v1))
+     * `main-figures/figure-5.pdf` (**Figure 5** of the [Manuscript](https://www.researchsquare.com/article/rs-1950480/v1))
+     * `main-figures/figure-6.pdf` (**Figure 6** of the [Manuscript](https://www.researchsquare.com/article/rs-1950480/v1))
     <br/><br/> 
     > **Outputs** (supplemental figures/tables):
-     * `suppl-figs-tables/figure-s1.pdf` (**Figure S1** of the [Supplementary Information]())
-     * `suppl-figs-tables/figure-s2.pdf` (**Figure S2** of the [Supplementary Information]())
-     * `suppl-figs-tables/figure-s3.pdf` (**Figure S3** of the [Supplementary Information]())
-     * `suppl-figs-tables/figure-s4.pdf` (**Figure S4** of the [Supplementary Information]())
-     * `suppl-figs-tables/figure-s5.pdf` (**Figure S5** of the [Supplementary Information]())
-     * `suppl-figs-tables/figure-s6.pdf` (**Figure S6** of the [Supplementary Information]())
-     * `suppl-figs-tables/figure-s7.pdf` (**Figure S7** of the [Supplementary Information]())
-     * `suppl-figs-tables/table-s5.pdf` (**Table S5** of the [Supplementary Information]())
-     * `suppl-figs-tables/table-s6.pdf` (**Table S6** of the [Supplementary Information]())
+     * `suppl-figs-tables/figure-s1.pdf` (**Figure S1** of the [Supplementary Information](https://assets.researchsquare.com/files/rs-1950480/v1/0ef0da513e6e0dd67200a2dc.pdf))
+     * `suppl-figs-tables/figure-s2.pdf` (**Figure S2** of the [Supplementary Information](https://assets.researchsquare.com/files/rs-1950480/v1/0ef0da513e6e0dd67200a2dc.pdf))
+     * `suppl-figs-tables/figure-s3.pdf` (**Figure S3** of the [Supplementary Information](https://assets.researchsquare.com/files/rs-1950480/v1/0ef0da513e6e0dd67200a2dc.pdf))
+     * `suppl-figs-tables/figure-s4.pdf` (**Figure S4** of the [Supplementary Information](https://assets.researchsquare.com/files/rs-1950480/v1/0ef0da513e6e0dd67200a2dc.pdf))
+     * `suppl-figs-tables/figure-s5.pdf` (**Figure S5** of the [Supplementary Information](https://assets.researchsquare.com/files/rs-1950480/v1/0ef0da513e6e0dd67200a2dc.pdf))
+     * `suppl-figs-tables/figure-s6.pdf` (**Figure S6** of the [Supplementary Information](https://assets.researchsquare.com/files/rs-1950480/v1/0ef0da513e6e0dd67200a2dc.pdf))
+     * `suppl-figs-tables/figure-s7.pdf` (**Figure S7** of the [Supplementary Information](https://assets.researchsquare.com/files/rs-1950480/v1/0ef0da513e6e0dd67200a2dc.pdf))
+     * `suppl-figs-tables/table-s5.pdf` (**Table S5** of the [Supplementary Information](https://assets.researchsquare.com/files/rs-1950480/v1/0ef0da513e6e0dd67200a2dc.pdf))
+     * `suppl-figs-tables/table-s6.pdf` (**Table S6** of the [Supplementary Information](https://assets.researchsquare.com/files/rs-1950480/v1/0ef0da513e6e0dd67200a2dc.pdf))
