@@ -1,7 +1,7 @@
 # Shifts in Care Utilization Patterns During the COVID-19 Pandemic: A High-Dimensional Study of Presentations for Ophthalmic Conditions in the United States
 _Charles Li, Flora Lum, Evan M. Chen, Philip A. Collender, Jennifer R. Head, Rahul N. Khurana, Emmett T. Cunningham Jr., Ramana S. Moorthy, David W. Parke II, Stephen D. McLeod_
 
-*Last updated:* **August 6, 2023** by Charles Li (cli@aao.org), including data up to **December 31, 2021**
+*Last updated:* **September 29, 2023** by Charles Li (cli@aao.org), including data up to **December 31, 2021**
 
 ## About
 

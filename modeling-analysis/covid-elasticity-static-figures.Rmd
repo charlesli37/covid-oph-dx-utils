@@ -1,7 +1,7 @@
 ---
 title: "R Script for _Shifts in Care Utilization Patterns During the COVID-19 Pandemic: A High-Dimensional Study of Presentations for Ophthalmic Conditions in the United States_"
 author: "Charles Li"
-date: "May 4, 2023"
+date: "September 4, 2023"
 output: 
 ---
 
@@ -1121,7 +1121,7 @@ write.csv(master_summarystats, 'modeling-analysis/dx-entity-quarterly-devs-and-r
 ```{r}
 #for circos ordering
 master_summarystats$short_name <- as.factor(master_summarystats$short_name)
-View(master_summarystats[, c("Q32020w", "Q32020w_adj", "Q42020w", "Q42020w_adj", "Q12021w", "Q12021w_adj", "Q22021w", "Q22021w_adj", "Q32021w", "Q32021w_adj", "Q42021w", "Q42021w_adj")])
+#View(master_summarystats[, c("Q32020w", "Q32020w_adj", "Q42020w", "Q42020w_adj", "Q12021w", "Q12021w_adj", "Q22021w", "Q22021w_adj", "Q32021w", "Q32021w_adj", "Q42021w", "Q42021w_adj")])
 ```
 
 
@@ -1194,7 +1194,7 @@ set_track_gap(cm_h(0.05))
 ## TRACK 3: heatmap of April 2020 deviations (raw, unweighted)
 
 circos.heatmap(master_summarystats[, rev(c("2020-04-01"))], track.height = mm_h(2.5),
-               col = colorRamp2(c(-1, -0.75, -0.50, -0.25, 0), c("#54278f", "#756bb1", "#9e9ac8", "#cbc9e2", "#f2f0f7")))
+               col = colorRamp2(c(min(master_summarystats$`2020-04-01`), max(master_summarystats$`2020-04-01`)), c("#3f007d", "#fcfbfd")))
 
 ### TRACK 3B: heatmap "y-axis" label
 circos.track(track.index = get.current.track.index(), panel.fun = function(x, y) {
@@ -1230,8 +1230,17 @@ circos.yaxis(side = "left", sector.index = "Blind", labels.cex = 0.35, lwd = 0.5
 
 ## LEGENDS
 lgd_trk1 = ComplexHeatmap::Legend(title = "Model performance error", title_gp = gpar(fontsize = 8, fontface = 'bold'), at = c("Below 5%", "5-10%", "10-12.5%"), legend_gp = gpar(fill = c('#e8be27','#f5e890', 'light grey')), labels_gp = gpar(fontsize = 7))
-lgd_trk2 = ComplexHeatmap::Legend(title = "Post-hiatus deviations", title_gp = gpar(fontsize = 8, fontface = 'bold'), at = c(-4, -2, 0, 2, 4), labels = c(expression(-delta*"*"), "", "", "", expression(+delta*"*")), col_fun = colorRamp2(c(-4, 0, 4), c("#de425b", "#eeeeee", "#21a6db")), direction = 'horizontal', legend_width = unit(3, "cm"), labels_gp = gpar(fontsize = 7))
-lgd_trk3 = ComplexHeatmap::Legend(title = "Apr 2020 deviation", title_gp = gpar(fontsize = 8, fontface = 'bold'), at = c(-1, -0.75, -0.50, -0.25, 0), labels = c("-1", "", "-0.5", "", "0"), col_fun = colorRamp2(c(-1, -0.75, -0.50, -0.25, 0), c("#54278f", "#756bb1", "#9e9ac8", "#cbc9e2", "#f2f0f7")), direction = 'horizontal', legend_width = unit(3, "cm"), labels_gp = gpar(fontsize = 7))
+
+lgd_trk2 = ComplexHeatmap::Legend(title = "Post-hiatus deviation", title_gp = gpar(fontsize = 8, fontface = 'bold'), at = c(-4, -2, 0, 2, 4), labels = c(expression(-delta*"*"), "", "", "", expression(+delta*"*")), col_fun = colorRamp2(c(-4, 0, 4), c("#de425b", "#eeeeee", "#21a6db")), direction = 'horizontal', legend_width = unit(3, "cm"), labels_gp = gpar(fontsize = 7))
+
+lgd_trk3 = ComplexHeatmap::Legend(title = "Apr 2020 decrease",
+                                  border = "gray85",
+                                  title_gp = gpar(fontsize = 8, fontface = 'bold'), 
+                                  at = c(-1, 0), 
+                                  labels = c(expression(delta['max']==-0.91), expression(delta['min']==-0.18)), 
+                                  col_fun = colorRamp2(c(min(master_summarystats$`2020-04-01`), max(master_summarystats$`2020-04-01`)), c("#3f007d", "#fcfbfd")), 
+                                  direction = 'horizontal', legend_width = unit(3, "cm"), labels_gp = gpar(fontsize = 7))
+
 lgd_trk4 = ComplexHeatmap::Legend(title = "Time to recovery", title_gp = gpar(fontsize = 8, fontface = 'bold'), at = c("Partial recovery", "Sustained recovery"), legend_gp = gpar(fill = c('#b2e2e2','#66c2a4')), labels_gp = gpar(fontsize = 7))
 
 lgd_listA = ComplexHeatmap::packLegend(lgd_trk1, lgd_trk4, direction = "vertical", row_gap = unit(2, "mm"))
@@ -1243,7 +1252,7 @@ ComplexHeatmap::draw(lgd_listB, x = unit(14, "cm"), y = unit(0.10, "cm"), just =
 dev.off()
 ```
 
-# Supplemental / exploratory figures (LEFT OFF HERE ON RE-RUN 6 MAR 2023 4:44PM)
+# Supplemental / exploratory figures
 
 ### FIGURE S1: Deviations faceted by category
 
