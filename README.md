@@ -3,6 +3,8 @@ _Charles Li, Flora Lum, Evan M. Chen, Philip A. Collender, Jennifer R. Head, Rah
 
 *Last updated:* **November 9, 2023** by Charles Li (cli@aao.org), including data up to **December 31, 2021**
 
+[![DOI](https://zenodo.org/badge/542403039.svg)](https://zenodo.org/doi/10.5281/zenodo.10095383)
+
 ## About
 
 This repository hosts the code, outputs, and supplementary information for a study focused on understanding the disruptions to ophthalmic care in the United States for the first two years of the COVID-19 pandemic. Using data from the [American Academy of Ophthalmology IRIS:registered: Registry (Intelligent Research in Sight)](https://www.aao.org/iris-registry), this research characterized patterns of eye care utilization across 261 different ocular conditions from January 2020 to December 2021 by leveraging a common analytical framework to explore factors that may explain the differential underutilization of care. 
@@ -12,8 +14,6 @@ In the acute phase of the pandemic, redistributions of healthcare resources were
 ## Data Processing and Analytic Steps
 
 This project consists of the following main stages:
-
-![common-analytical-framework](main-figures/figure-1.pdf)
 
 ### Step 1A. Construct an inventory of ophthalmic diagnoses to study
 
