@@ -3,13 +3,13 @@ _Charles Li, Flora Lum, Evan M. Chen, Philip A. Collender, Jennifer R. Head, Rah
 
 *Last updated:* **December 17, 2023** by Charles Li (cli@aao.org), including data up to **December 31, 2021**
 
-*Citation*: Li, C., Lum, F., Chen, E.M. et al. Shifts in ophthalmic care utilization during the COVID-19 pandemic in the US. Commun Med 3, 181 (2023). https://doi.org/10.1038/s43856-023-00416-4
+> Li, C., Lum, F., Chen, E.M. et al. Shifts in ophthalmic care utilization during the COVID-19 pandemic in the US. Commun Med 3, 181 (2023). https://doi.org/10.1038/s43856-023-00416-4
 
 [![DOI](https://zenodo.org/badge/542403039.svg)](https://zenodo.org/doi/10.5281/zenodo.10095383)
 
 ## About
 
-This repository hosts the code, outputs, and supplementary information for a study focused on understanding the disruptions to ophthalmic care in the United States for the first two years of the COVID-19 pandemic. Using data from the [American Academy of Ophthalmology IRIS Registry\textsuperscript{\textregistered} (Intelligent Research in Sight)](https://www.aao.org/iris-registry), this research characterized patterns of eye care utilization across 261 different ocular conditions from January 2020 to December 2021 by leveraging a common analytical framework to explore factors that may explain the differential underutilization of care. 
+This repository hosts the code, outputs, and supplementary information for a study focused on understanding the disruptions to ophthalmic care in the United States for the first two years of the COVID-19 pandemic. Using data from the [American Academy of Ophthalmology IRIS Registry® (Intelligent Research in Sight)](https://www.aao.org/iris-registry), this research characterized patterns of eye care utilization across 261 different ocular conditions from January 2020 to December 2021 by leveraging a common analytical framework to explore factors that may explain the differential underutilization of care. 
 
 In the acute phase of the pandemic, redistributions of healthcare resources were required to minimize mortality and limit the spread of COVID-19. However, the patterns of, and reasons explaining, sustained utilization reductions in the post-acute phase are not entirely understood. Existing research by health economists have estimated the "elasticity" (i.e., responsiveness) of demand of healthcare services in response to changes in another variable (e.g., cost, income); similarly, we explored how utilization levels for a wide range of ocular diagnoses exhibited varying degrees of sensitivity to possible pandemic-related restrictions to the seeking or delivery of care (e.g., resource constraints, behavioral modifications). We specifically examined whether features of ocular diagnoses themselves&mdash;namely, disease severity&mdash;could explain shifts in care utilization patterns that were observed during the pandemic.
 
