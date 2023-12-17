@@ -1,0 +1,1820 @@
+---
+title: "R Script for _Shifts in Care Utilization Patterns During the COVID-19 Pandemic: A High-Dimensional Study of Presentations for Ophthalmic Conditions in the United States_"
+author: "Charles Li"
+date: "September 4, 2023"
+output: 
+---
+
+```{r}
+#import needed packages
+library(ggplot2)
+library(plotly)
+library(ggpubr)
+library(gridExtra)
+library(cowplot)
+library(forecast)
+library(lubridate)
+library(tidyverse)
+library(ggbump)
+library(scales)
+library(MASS)
+library(circlize)
+library(ComplexHeatmap)
+library(zoo)
+library(AER)
+library(VGAM)
+library(ggrepel)
+library(archetypes)
+library(magrittr)
+library(kableExtra)
+library(flextable)
+library(officer)
+library(R.utils)
+library(gridBase)
+library(latex2exp)
+library(ggsci)
+options(scipen=10000)
+```
+
+# Initialization
+
+```{r setup, include=FALSE, echo=FALSE}
+require("knitr")
+opts_knit$set(root.dir = "/Users/charlesli/Library/CloudStorage/OneDrive-AmericanAcademyofOphthalmology/covid-oph-dx-utils")
+```
+
+## Data import
+```{r}
+#### datasets
+master_dx_df <- as.data.frame(read.csv('data-extraction/dx_proportions_and_cnts.csv'))
+master_dx_df$Y <- master_dx_df$num_dx_patients
+
+#### codebooks 
+icd_df <- as.data.frame(read.csv('codebooks/ccsr_codebook_for_sql.csv'))
+icd_df$Diagnosis.Name <- stringr::str_trim(icd_df$DiagnosisEntity)
+ccsr_cats <- read.csv('codebooks/source materials/CCSR ICD10 categories 5.4.20_modified.csv', header = F)
+icd_df <- merge(icd_df, ccsr_cats, by.x = 'CCSR.Category', by.y = 'V1')
+icd_df$Category <- icd_df$V2
+icd_df$DiagnosisEntity <- stringr::str_trim(icd_df$DiagnosisEntity)
+
+severity_idx <- as.data.frame(read.csv('codebooks/base_score_modified.csv'))
+severity_idx <- severity_idx[severity_idx$MAPPED == 1, ]
+severity_idx$MAPPED_ENTITY_NAME <- stringr::str_trim(severity_idx$MAPPED_ENTITY_NAME)
+severity_idx <- unique(severity_idx)
+
+vehss_idx <- read.csv('codebooks/VT_vs_NVT_Big4_crosswalk.csv')
+vehss_idx$DiagnosisEntity <- stringr::str_trim(vehss_idx$DiagnosisEntity)
+```
+
+## 'Elasticity' function to estimate deviations from counterfactual expectations
+```{r}
+elasticities <- function(entity_name, input_df){ #input: name of the dx entity, and master_dx_df
+  
+  #### [STEP 0] prepare pre-, post-, and all datasets ####
+  
+  pre_df <- input_df[input_df$dx_name == entity_name & input_df$year %in% c(2017, 2018, 2019), ]
+  post_df <- input_df[input_df$dx_name == entity_name & input_df$year %in% c(2020, 2021), ]
+  all_df <- input_df[input_df$dx_name == entity_name, ]
+  
+  #### [STEP 1] counterfactual model selection ####
+  
+  #write all formulas that will be candidate models 
+  formulaList <- rep(list(NA),10)
+  formulaList[[1]] <- Y ~ year + as.factor(month)
+  formulaList[[2]] <- Y ~ year + as.factor(month)  + sin_3 + cos_3
+  formulaList[[3]] <- Y ~ year + as.factor(month)  + sin_12 + cos_12
+  formulaList[[4]] <- Y ~ year + as.factor(month)  + sin_6 + cos_6
+  formulaList[[5]] <- Y ~ year + as.factor(month)  + sin_6 + cos_6 + sin_12 + cos_12
+  formulaList[[6]] <- Y ~ year + as.factor(month)  + sin_6 + cos_6 + sin_3 + cos_3
+  formulaList[[7]] <- Y ~ year + as.factor(month)  + sin_12 + cos_12 + sin_3 + cos_3
+  formulaList[[8]] <- Y ~ year + as.factor(month)  + sin_6 + cos_6 + sin_12 + cos_12 + sin_3 + cos_3
+  formulaList[[9]] <- Y ~ year + sin_6 + cos_6 + sin_12 + cos_12 + sin_3 + cos_3
+  formulaList[[10]] <- Y ~ as.factor(month) + sin_6 + cos_6 + sin_12 + cos_12 + sin_3 + cos_3
+  
+  #initialize a matrix to store results of the 10 candidate models (rows) and 7 performance metrics (cols)
+  matrix_df <- matrix(NA, nrow = 10, ncol = 7)
+  
+  #fit each of the 10 models, and calculate the cross validated error using leave out one year
+  for (j in 1:10){
+    #set up empty vector to store the 3 sets of R^2 and cross-validated errors -- 3 for each year left out
+    mse.mat <- rep(NA, 3)
+    rmse.mat <- rep(NA, 3)
+    mae.mat <- rep(NA, 3)
+    rmspe.mat <- rep(NA, 3)
+    mape.mat <- rep(NA, 3)
+    rsq.mat <- rep(NA, 3)
+    
+    for (i in 1:3){
+      V <- c(2017:2019)[i]
+      train <- subset(pre_df, year != V) #training set -- all but one year
+      test <- subset(pre_df, year == V) #test set -- the left-out year
+      
+      mod.p <- glm(formula = formulaList[[j]], data = train, family = "poisson") #train on training set
+      predict.p <- predict(mod.p, test, "response") #predict on holdout set
+      
+      #calculate performance metrics on the holdout set
+      mse.mat[i] <- mean((test$Y - predict.p)^2)  ##mean squared error (MSE), averaged across all months in the holdout set
+      rmse.mat[i] <- sqrt(mean((test$Y - predict.p)^2)) ##root mean squared error (RMSE)
+      mae.mat[i] <- mean(abs(test$Y - predict.p))  ##mean absolute error (MAE), averaged across all months in the holdout set
+      rmspe.mat[i] <- sqrt(mean(((test$Y - predict.p)/test$Y)^2)) ##root mean squared percentage error (RMSPE)
+      mape.mat[i] <- mean(abs((test$Y - predict.p)/test$Y))  ##mean absolute percentage error (MAPE)
+      rsq.mat[i] <- cor(test$Y,predict.p)^2      ##out-of-sample R^2 
+      
+      
+    }
+    
+    matrix_df[j,1] <- j
+    matrix_df[j,2] <- mean(mse.mat)
+    matrix_df[j,3] <- mean(rmse.mat)
+    matrix_df[j,4] <- mean(mae.mat)
+    matrix_df[j,5] <- mean(rmspe.mat)
+    matrix_df[j,6] <- mean(mape.mat)
+    matrix_df[j,7] <- mean(rsq.mat)
+  }
+  
+  matrix_df <- data.frame(matrix_df)
+  colnames(matrix_df) <- c("Formula", "MSE", "RMSE", "MAE", "RMSPE", "MAPE", "r.squared") 
+  
+  #### [STEP 2A] counterfactual model selection - isolate the model that has the lowest MSE
+  
+  minMSE <- min(matrix_df$MSE)
+  bestFormula <- matrix_df[which(matrix_df$MSE == minMSE),]$Formula[1]
+
+  bestMetrics <- matrix_df[which(matrix_df$Formula == bestFormula),] ####RETURNED OUTPUT (perfrm metrics of the best mod)
+  best_model <- formulaList[[bestFormula]] ####RETURNED OUTPUT
+  
+  #### [STEP 2B] dispersion parameter calculation - first fit the poisson model once more for the select model
+  
+  mod.best.pois <- glm(formula = best_model, family = poisson, data = pre_df)
+  theta.pois <- sum(residuals(mod.best.pois,type ="pearson")^2)/mod.best.pois$df.residual ####RETURNED OUTPUT
+  
+  #### [STEP 2C] hypothesis test for extradispersion and decide which models to fit accordingly
+  
+  hyptest <- dispersiontest(mod.best.pois, alternative = "two.sided")
+  is.extradispersed <- ifelse(hyptest$p.value <= 0.05, T, F)
+  disp.direction <- 
+    if(is.extradispersed == T){
+      ifelse(hyptest$estimate > 1, "overdispersed", "underdispersed")
+    }
+    else {
+      "equidispersed"
+    }
+  
+  #### [STEP 3A] if there is no significant extradispersion, or if the model is underdispersed, fit a regular Poisson model
+  ####           and compute the 95% PI and preds for the post-period
+  if(disp.direction != "overdispersed"){
+    
+    model_dist <- "Poisson" ####RETURNED OUTPUT
+    all_df$predicted <- predict(mod.best.pois, all_df, type = 'response')
+    
+    pred.post.final <- predict(mod.best.pois, post_df, se = T)
+    pred.post.actual <- predict(mod.best.pois, post_df, type = 'response')
+    
+    predints <- lapply(1:length(pred.post.final$fit),
+                         function(m){
+                           rpois(1e5, exp(rnorm(1e5, pred.post.final$fit[m], pred.post.final$se.fit[m])))
+                         })
+    
+    teststatDist <- lapply(1:length(pred.post.final$fit),
+                           function(m){
+                             (unlist(predints[m]) - pred.post.actual[m])/pred.post.actual[m]
+                         })
+    
+    year <- c(rep(2020, 12), rep(2021, 12))
+    month <- c(seq(1, 12), seq(1, 12))
+    lowerPI <- sapply(predints, quantile, 0.025, na.rm = T)
+    upperPI <- sapply(predints, quantile, 0.975, na.rm = T)
+    
+    teststatObs <- lapply(1:length(pred.post.final$fit),
+                           function(m){
+                             (post_df$Y[m]-pred.post.actual[m])/pred.post.actual[m]
+                         })
+     
+    predintsDist <- lapply(1:length(pred.post.final$fit),
+                           function(m){
+                             (unlist(post_df$Y[m]) - unlist(predints[m]))/unlist(predints[m])
+                         })
+    
+    pvalueList <- lapply(1:length(pred.post.final$fit),
+                           function(m){
+                             sum(abs(unlist(teststatDist[m])) >= abs(unlist(teststatObs[m])))/1e5
+                         })
+    
+    pvalue <- unlist(pvalueList) + 0.00001
+    
+    zscoreList <- lapply(1:length(pred.post.final$fit),
+                           function(m){
+                             (unlist(teststatObs[m]) - mean(unlist(teststatDist[m])))/sd(unlist(teststatDist[m]))
+                         })
+    
+    zscore <- unlist(zscoreList) 
+  
+    predictionVariance <- pred.post.final$se.fit
+    predictionFits <- pred.post.final$fit
+  
+    PI_df <- data.frame(year, month, lowerPI, upperPI, pvalue, zscore, predictionVariance, predictionFits)
+    
+    ####RETURNED OUTPUT
+    all_df <- merge(all_df, PI_df, by = c("year", "month"), all.x = T)
+    all_df$elasticity <- (all_df$Y-all_df$predicted)/all_df$predicted
+    all_df$lowerBound <- (all_df$Y-all_df$upperPI)/all_df$upperPI #take the upperPI for the lowerBound bc that's the "max" deviation
+    all_df$upperBound <- (all_df$Y-all_df$lowerPI)/all_df$lowerPI #take the lowerPI for the upperBound bc that's the "min" deviation
+    all_df$lowerupper <- paste0("(", round(all_df$lowerBound, 3), ",", round(all_df$upperBound, 3), ")")
+    all_df$pred_signif <- ifelse(all_df$Y < all_df$lowerPI | all_df$Y > all_df$upperPI, '*', '')
+    
+  }
+  
+  
+  #### [STEP 3B] decide quasi-poisson vs. neg bin for signif. overdispersed data, and compute the 95% PI and preds for the post-period
+  if(disp.direction == "overdispersed"){
+   
+    #fit the quasi-poisson model to 2017-2019 data
+    mod.best.qp <- glm(formula = best_model, family = quasipoisson, data = pre_df)
+
+    #calculate the QP residuals across all years' data
+    residp <- (all_df$Y - predict(mod.best.qp, all_df, type = "response"))^2
+    predictp <- predict(mod.best.qp, all_df, type = "response")
+  
+    #fit the negative binomial model to 2017-2019 data, and repeat steps to calculate mean residuals across bins
+    mod.best.nb <- glm.nb(best_model, data=pre_df)
+  
+    residnb <- (all_df$Y - predict(mod.best.nb, all_df, type = "response"))^2
+    predictnb <- predict(mod.best.nb, all_df, type = "response")
+
+    ##examine whether the residuals and the predictions vary linearly or quadratically##
+
+    linear.mod.p <- lm(residp~predictp)   ###quasi-Poisson###
+    predictnbsq <- predictnb*predictnb    ###negative binomial##
+    quadratic.mod.nb <- lm(residnb~predictnbsq)
+
+    ## if [NB - quadratic] has a lower AIC than [QP-linear], then use NB distribution; otherwise, use the QP distribution
+    ifelse(AIC(quadratic.mod.nb) < AIC(linear.mod.p),
+           all_df$predicted <- predict(mod.best.nb, all_df, type = 'response'),
+           all_df$predicted <- predict(mod.best.qp, all_df, type = 'response')
+    )
+
+    ####RETURNED OUTPUT
+    ifelse(AIC(quadratic.mod.nb) < AIC(linear.mod.p),
+           model_dist <- 'negative binomial',
+           model_dist <- 'quasi-Poisson'
+    )  
+
+    ifelse(AIC(quadratic.mod.nb) < AIC(linear.mod.p),
+           mod_theta <- summary(mod.best.nb)$theta,
+           mod_theta <- summary(mod.best.qp)$dispersion
+    )
+
+    ##now compute the 95% CI for the post period using the quasi-poisson vs. neg bin decision##
+    ifelse(AIC(quadratic.mod.nb) < AIC(linear.mod.p),
+           pred.post.final <- predict(mod.best.qp, post_df, se = T),
+           pred.post.final <- predict(mod.best.nb, post_df, se = T)
+    )
+    
+    ifelse(AIC(quadratic.mod.nb) < AIC(linear.mod.p),
+           pred.post.actual <- predict(mod.best.qp, post_df, type = 'response'),
+           pred.post.actual <- predict(mod.best.nb, post_df, type = 'response')
+    )
+    
+    
+    ##define a custom function to sample from a quasi-Poisson "distribution"
+    rqpois_rb <- function(n, mu, theta) {rnbinom(n = n, mu = mu, size = mu/(theta-1))
+    } 
+  
+    ifelse(AIC(quadratic.mod.nb) < AIC(linear.mod.p), 
+           predints <- lapply(1:length(pred.post.final$fit),
+                              function(m){
+                                rnegbin(1e5, exp(rnorm(1e5, pred.post.final$fit[m], pred.post.final$se.fit[m])),
+                                        theta = mod_theta)
+                              }),
+           predints <- lapply(1:length(pred.post.final$fit),
+                              function(m){
+                                rqpois_rb(1e5, exp(rnorm(1e5, pred.post.final$fit[m], pred.post.final$se.fit[m])),
+                                          theta = mod_theta)
+                              })
+    )
+    
+    teststatDist <- lapply(1:length(pred.post.final$fit),
+                           function(m){
+                             (unlist(predints[m]) - pred.post.actual[m])/pred.post.actual[m]
+                         })
+
+    year <- c(rep(2020, 12), rep(2021, 12))
+    month <- c(seq(1, 12), seq(1, 12))
+    lowerPI <- sapply(predints, quantile, 0.025, na.rm = T)
+    upperPI <- sapply(predints, quantile, 0.975, na.rm = T)
+    
+    teststatObs <- lapply(1:length(pred.post.final$fit),
+                           function(m){
+                             (post_df$Y[m]-pred.post.actual[m])/pred.post.actual[m]
+                         })
+    
+    predintsDist <- lapply(1:length(pred.post.final$fit),
+                           function(m){
+                             (unlist(post_df$Y[m]) - unlist(predints[m]))/unlist(predints[m])
+                         })
+    
+    pvalueList <- lapply(1:length(pred.post.final$fit),
+                           function(m){
+                             sum(abs(unlist(teststatDist[m])) >= abs(unlist(teststatObs[m])))/1e5
+                         })
+    
+    pvalue <- unlist(pvalueList) + 0.00001
+  
+    zscoreList <- lapply(1:length(pred.post.final$fit),
+                           function(m){
+                             (unlist(teststatObs[m]) - mean(unlist(teststatDist[m])))/sd(unlist(teststatDist[m]))
+                         })
+    
+    zscore <- unlist(zscoreList)
+    
+    predictionVariance <- pred.post.final$se.fit
+    predictionFits <- pred.post.final$fit
+  
+    PI_df <- data.frame(year, month, lowerPI, upperPI, pvalue, zscore, predictionVariance, predictionFits)
+  
+    ####RETURNED OUTPUT
+    all_df <- merge(all_df, PI_df, by = c("year", "month"), all.x = T)
+    all_df$elasticity <- (all_df$Y-all_df$predicted)/all_df$predicted
+    all_df$lowerBound <- (all_df$Y-all_df$upperPI)/all_df$upperPI #take the upperPI for the lowerBound bc that's the "max" deviation
+    all_df$upperBound <- (all_df$Y-all_df$lowerPI)/all_df$lowerPI #take the lowerPI for the upperBound bc that's the "min" deviation
+    all_df$lowerupper <- paste0("(", round(all_df$lowerBound, 3), ",", round(all_df$upperBound, 3), ")")
+    all_df$pred_signif <- ifelse(all_df$Y < all_df$lowerPI | all_df$Y > all_df$upperPI, '*', '')
+  
+  }
+  
+  deviance_df <- all_df[42:60, c('elasticity', 'pred_signif')]
+  deviance_vec <- ifelse(deviance_df$pred_signif == "*", deviance_df$elasticity, 0)
+  unweighted_avg <- mean(deviance_vec)
+  weighted_avg <- sum(deviance_vec *  (1/pred.post.final$se.fit[6:24])^2)/ sum((1/pred.post.final$se.fit[6:24])^2)
+  
+  #more robust approach to IVW
+  predintsQ32020joint <- c((unlist(predintsDist[7])+unlist(predintsDist[8])+unlist(predintsDist[9]))/3)
+  teststatDistQ32020 <- c((unlist(teststatDist[7])+unlist(teststatDist[8])+unlist(teststatDist[9]))/3)
+  
+  predintsQ42020joint <- c((unlist(predintsDist[10])+unlist(predintsDist[11])+unlist(predintsDist[12]))/3)
+  teststatDistQ42020 <- c((unlist(teststatDist[10])+unlist(teststatDist[11])+unlist(teststatDist[12]))/3)
+  
+  predintsQ12021joint <- c((unlist(predintsDist[13])+unlist(predintsDist[14])+unlist(predintsDist[15]))/3)
+  teststatDistQ12021 <- c((unlist(teststatDist[13])+unlist(teststatDist[14])+unlist(teststatDist[15]))/3)
+  
+  predintsQ22021joint <- c((unlist(predintsDist[16])+unlist(predintsDist[17])+unlist(predintsDist[18]))/3)
+  teststatDistQ22021 <- c((unlist(teststatDist[16])+unlist(teststatDist[17])+unlist(teststatDist[18]))/3)
+  
+  predintsQ32021joint <- c((unlist(predintsDist[19])+unlist(predintsDist[20])+unlist(predintsDist[21]))/3)
+  teststatDistQ32021 <- c((unlist(teststatDist[19])+unlist(teststatDist[20])+unlist(teststatDist[21]))/3)
+  
+  predintsQ42021joint <- c((unlist(predintsDist[22])+unlist(predintsDist[23])+unlist(predintsDist[24]))/3)
+  teststatDistQ42021 <- c((unlist(teststatDist[22])+unlist(teststatDist[23])+unlist(teststatDist[24]))/3)
+  
+  predintsAllpostjoint <- c(Reduce("+", predintsDist[6:24])/19)
+  teststatDistAllpost <- c(Reduce("+", teststatDist[6:24])/19)
+  
+  ##extract summary stats for each aggregate time period
+  meanQ32020 <- mean(unlist(predintsQ32020joint))
+  medianQ32020 <- quantile(unlist(predintsQ32020joint), 0.5)
+  upperboundQ32020 <- quantile(unlist(predintsQ32020joint), 0.975)
+  lowerboundQ32020 <- quantile(unlist(predintsQ32020joint), 0.025)
+  confintQ32020 <- paste0("(", round(lowerboundQ32020, 3), ",", round(upperboundQ32020, 3), ")")
+  pvalEmpricialQ32020 <- (sum(abs(teststatDistQ32020) >= abs(unlist(meanQ32020)))/1e5) + 0.00001
+  
+  meanQ42020 <- mean(unlist(predintsQ42020joint))
+  medianQ42020 <- quantile(unlist(predintsQ42020joint), 0.5)
+  upperboundQ42020 <- quantile(unlist(predintsQ42020joint), 0.975)
+  lowerboundQ42020 <- quantile(unlist(predintsQ42020joint), 0.025)
+  confintQ42020 <- paste0("(", round(lowerboundQ42020, 3), ",", round(upperboundQ42020, 3), ")")
+  pvalEmpricialQ42020 <- (sum(abs(teststatDistQ42020) >= abs(unlist(meanQ42020)))/1e5) + 0.00001
+  
+  meanQ12021 <- mean(unlist(predintsQ12021joint))
+  medianQ12021 <- quantile(unlist(predintsQ12021joint), 0.5)
+  upperboundQ12021 <- quantile(unlist(predintsQ12021joint), 0.975)
+  lowerboundQ12021 <- quantile(unlist(predintsQ12021joint), 0.025)
+  confintQ12021 <- paste0("(", round(lowerboundQ12021, 3), ",", round(upperboundQ12021, 3), ")")
+  pvalEmpricialQ12021 <- (sum(abs(teststatDistQ12021) >= abs(unlist(meanQ12021)))/1e5) + 0.00001
+  
+  meanQ22021 <- mean(unlist(predintsQ22021joint))
+  medianQ22021 <- quantile(unlist(predintsQ22021joint), 0.5)
+  upperboundQ22021 <- quantile(unlist(predintsQ22021joint), 0.975)
+  lowerboundQ22021 <- quantile(unlist(predintsQ22021joint), 0.025)
+  confintQ22021 <- paste0("(", round(lowerboundQ22021, 3), ",", round(upperboundQ22021, 3), ")")
+  pvalEmpricialQ22021 <- (sum(abs(teststatDistQ22021) >= abs(unlist(meanQ22021)))/1e5) + 0.00001
+  
+  meanQ32021 <- mean(unlist(predintsQ32021joint))
+  medianQ32021 <- quantile(unlist(predintsQ32021joint), 0.5)
+  upperboundQ32021 <- quantile(unlist(predintsQ32021joint), 0.975)
+  lowerboundQ32021 <- quantile(unlist(predintsQ32021joint), 0.025)
+  confintQ32021 <- paste0("(", round(lowerboundQ32021, 3), ",", round(upperboundQ32021, 3), ")")
+  pvalEmpricialQ32021 <- (sum(abs(teststatDistQ32021) >= abs(unlist(meanQ32021)))/1e5) + 0.00001
+  
+  meanQ42021 <- mean(unlist(predintsQ42021joint))
+  medianQ42021 <- quantile(unlist(predintsQ42021joint), 0.5)
+  upperboundQ42021 <- quantile(unlist(predintsQ42021joint), 0.975)
+  lowerboundQ42021 <- quantile(unlist(predintsQ42021joint), 0.025)
+  confintQ42021 <- paste0("(", round(lowerboundQ42021, 3), ",", round(upperboundQ42021, 3), ")")
+  pvalEmpricialQ42021 <- (sum(abs(teststatDistQ42021) >= abs(unlist(meanQ42021)))/1e5) + 0.00001
+  
+  meanAllpost <- mean(unlist(predintsAllpostjoint))
+  medianAllpost <- quantile(unlist(predintsAllpostjoint), 0.5)
+  upperboundAllpost <- quantile(unlist(predintsAllpostjoint), 0.975)
+  lowerboundAllpost <- quantile(unlist(predintsAllpostjoint), 0.025)
+  confintAllpost <- paste0("(", round(lowerboundAllpost, 3), ",", round(upperboundAllpost, 3), ")")
+  pvalEmpricialAllpost <- (sum(abs(teststatDistAllpost) >= abs(unlist(meanAllpost)))/1e5) + 0.00001
+  
+  summaryDevNames <- c('entity_name', 'meanQ32020', 'medianQ32020', 'upperboundQ32020', 'lowerboundQ32020', 'confintQ32020', 'pvalEmpricialQ32020', 'meanQ42020', 'medianQ42020', 'upperboundQ42020', 'lowerboundQ42020', 'confintQ42020', 'pvalEmpricialQ42020', 'meanQ12021', 'medianQ12021', 'upperboundQ12021', 'lowerboundQ12021', 'confintQ12021', 'pvalEmpricialQ12021', 'meanQ22021', 'medianQ22021', 'upperboundQ22021', 'lowerboundQ22021', 'confintQ22021', 'pvalEmpricialQ22021', 'meanQ32021', 'medianQ32021', 'upperboundQ32021', 'lowerboundQ32021', 'confintQ32021', 'pvalEmpricialQ32021', 'meanQ42021', 'medianQ42021', 'upperboundQ42021', 'lowerboundQ42021', 'confintQ42021', 'pvalEmpricialQ42021', 'meanAllpost', 'medianAllpost', 'upperboundAllpost', 'lowerboundAllpost', 'confintAllpost',  'pvalEmpricialAllpost')
+  summaryDeviations <- c(entity_name, meanQ32020, medianQ32020, upperboundQ32020, lowerboundQ32020, confintQ32020, pvalEmpricialQ32020, meanQ42020, medianQ42020, upperboundQ42020, lowerboundQ42020, confintQ42020, pvalEmpricialQ42020, meanQ12021, medianQ12021, upperboundQ12021, lowerboundQ12021, confintQ12021, pvalEmpricialQ12021, meanQ22021, medianQ22021, upperboundQ22021, lowerboundQ22021, confintQ22021, pvalEmpricialQ22021, meanQ32021, medianQ32021, upperboundQ32021, lowerboundQ32021, confintQ32021, pvalEmpricialQ32021, meanQ42021, medianQ42021, upperboundQ42021, lowerboundQ42021, confintQ42021, pvalEmpricialQ42021, meanAllpost, medianAllpost, upperboundAllpost, lowerboundAllpost, confintAllpost,  pvalEmpricialAllpost)
+  
+  summaryDevTable <- as.data.frame(cbind(summaryDevNames, summaryDeviations))
+  rownames(summaryDevTable) <- c()
+  
+res <- list(entity_name, #1
+            best_model,  #2
+            bestMetrics, #3
+            is.extradispersed, #4
+            disp.direction, #5
+            theta.pois, #6
+            model_dist, #7
+            all_df, #8
+            all_df[all_df$year %in% c(2020, 2021), c('dx_name', 'date', 'elasticity', 'pred_signif')], #9
+            all_df[all_df$date == '2020-04-01', 'elasticity'], #10
+            unweighted_avg, #11
+            weighted_avg, #12
+            all_df[all_df$year %in% c(2020, 2021), c('dx_name', 'date', 'lowerupper')], #13
+            all_df[all_df$year %in% c(2020, 2021), c('dx_name', 'date', 'pvalue')], #14
+            all_df[all_df$year %in% c(2020, 2021), c('dx_name', 'date', 'zscore')], #15
+            summaryDevTable) #16
+
+return(res)
+}
+```
+
+## Model and diagnosis entity summaries
+```{r}
+hm_dx_list<- as.list(unique(icd_df$Diagnosis.Name))
+obj1 <- lapply(hm_dx_list, elasticities, master_dx_df) #elasticity objects for all dx entities
+```
+
+```{r}
+model_dx_name <- lapply(obj1,'[[',1) #the name of the diagnosis entity
+model_spec <- lapply(obj1,'[[',2) #the formula of the selected model
+model_MSE <- lapply(lapply(obj1,'[[',3), '[[', 2)
+model_RMSE <- lapply(lapply(obj1,'[[',3), '[[', 3)
+model_MAE <- lapply(lapply(obj1,'[[',3), '[[', 4)
+model_RMSPE <- lapply(lapply(obj1,'[[',3), '[[', 5)
+model_MAPE <- lapply(lapply(obj1,'[[',3), '[[', 6)
+model_r2 <- lapply(lapply(obj1,'[[',3), '[[', 7)
+model_dispStatus <- lapply(obj1,'[[',4) 
+model_dispDirection <- lapply(obj1,'[[',5) 
+model_dispParameter <- lapply(obj1,'[[',6) 
+model_selectedDist <- lapply(obj1,'[[',7) 
+
+df_models <- as.data.frame(cbind(model_dx_name, model_spec, model_MSE, model_RMSE, model_MAE, model_RMSPE, model_MAPE, model_r2, model_dispStatus, model_dispDirection, model_dispParameter, model_selectedDist))
+colnames(df_models) <- c("Diagnosis Name", "Formula", "MSE", "RMSE", "MAE", "RMSPE", "MAPE", "R-squared", "Extradispersion", "Dispersion Type", "Phi", "Distribution")
+df_models <- as.data.frame(apply(df_models, 2, as.character))
+```
+
+```{r}
+#generate summary stats of dx entities
+master_dx_df_sum <- 
+master_dx_df %>%
+  group_by(dx_name) %>%
+  summarise(
+    mean_monthly_pts = round(mean(num_dx_patients), 2),
+    SD_monthly_pts = round(sd(num_dx_patients), 2),
+    median_monthly_pts = round(median(num_dx_patients), 2),
+    IQR_monthly_pts = round(IQR(num_dx_patients), 2),
+    max_monthly_pts = max(num_dx_patients),
+    min_monthly_pts = min(num_dx_patients)
+  )
+```
+
+```{r}
+df_models <- merge(df_models, master_dx_df_sum, by.x = "Diagnosis Name", by.y = "dx_name")
+```
+
+```{r}
+write.csv(df_models, 'modeling-analysis/dx-entity-models-summstats.csv')
+```
+
+## Filter out diagnosis entities with poor model performance
+```{r}
+#drop based on PE metric (RMSPE <= 0.125)
+accurate_dx_list <- df_models[df_models$RMSPE <= 0.125, 'Diagnosis Name']
+```
+
+## Diagnosis entity codebook for supplement
+For the manuscript supplement (PDF version, Table S1) - export a mapping of ICD-10-CM codes corresponding to all 336 diagnosis entities as Word documents (separate Word doc for each diagnosis category due to memory constraints)
+
+```{r}
+categoryList <- sort(unique(icd_df$Category))
+
+for (i in 1:length(categoryList)){
+  
+  icd_df_exp <- icd_df[icd_df$Category == categoryList[i], c("Category", "DiagnosisEntity", "ICD.10.Code", "Diagnosis" )]
+  colnames(icd_df_exp) <- c("Diagnosis Category", "Diagnosis Entity", "ICD-10 Code", "ICD-10 Description")
+  icd_df_exp <- icd_df_exp[order(icd_df_exp$`Diagnosis Category`, icd_df_exp$`Diagnosis Entity`, icd_df_exp$`ICD-10 Code`), ]
+  icd_df_exp$Included <- ifelse(icd_df_exp$`Diagnosis Entity` %in%  accurate_dx_list, 1, 0)
+  icd_df_exp$dummy_v <- paste0(icd_df_exp$`Diagnosis Entity`, icd_df_exp$Included)
+  icd_ft <- theme_box(flextable(icd_df_exp, col_keys = c('Diagnosis Category', 'Diagnosis Entity', 'ICD-10 Code', 'ICD-10 Description', 'Included')))
+  icd_ft2 <- merge_v(icd_ft, j = c('Diagnosis Entity', 'Diagnosis Category', 'dummy_v'), target = c('Diagnosis Entity', 'Diagnosis Category', 'Included'))
+  icd_ft_final <- valign(icd_ft2, j = 'Diagnosis Category', valign = 'top')
+  
+  read_docx() %>%
+    body_add_flextable(value = icd_ft_final) %>%
+    print(target = paste0("modeling-analysis/dx-entity-codebook-export/icd-codebook-suppl-", i, ".docx"))
+  
+}
+```
+
+## Monthly deviances, their 95% CIs, and p-values
+
+### Deviances (raw estimates)
+```{r}
+#RAW estimates, i.e., retaining original value of estimates that are not stat. signif. 
+all_devs <- lapply(obj1, '[[', 9) 
+
+obj2_df <- as.data.frame(do.call(rbind, all_devs))
+obj3 <- reshape2::dcast(obj2_df, dx_name ~ date, value.var="elasticity")
+obj3_p <- reshape2::dcast(obj2_df, dx_name ~ date, value.var="pred_signif")
+obj3_mat <- as.matrix(obj3[, -1])
+rownames(obj3_mat) <- obj3[, 1]
+
+#keep only diagnoses with accurate enough RMSPEs
+master_devsOrig <- as.data.frame(obj3_mat[rownames(obj3_mat) %in% accurate_dx_list, ])
+```
+
+```{r}
+write.csv(master_devsOrig, 'modeling-analysis/dx-entity-deviations.csv')
+```
+
+### 95% CIs
+```{r}
+all_dev_bounds <- lapply(obj1, '[[', 13) 
+obj2_df_dev <- as.data.frame(do.call(rbind, all_dev_bounds))
+obj3_dev <- reshape2::dcast(obj2_df_dev, dx_name ~ date, value.var="lowerupper")
+obj3_mat_dev <- as.matrix(obj3_dev[, -1])
+rownames(obj3_mat_dev) <- obj3_dev[, 1]
+
+#keep only diagnoses with accurate enough RMSPEs
+master_dev_bounds <- as.data.frame(obj3_mat_dev[rownames(obj3_mat_dev) %in% accurate_dx_list, ])
+```
+
+```{r}
+write.csv(master_dev_bounds, 'modeling-analysis/dx-entity-deviation-bounds.csv')
+```
+
+### Unadjusted p-values
+```{r}
+all_pvalues <- lapply(obj1, '[[', 14) 
+obj2_df_pval <- as.data.frame(do.call(rbind, all_pvalues))
+obj3_pval <- reshape2::dcast(obj2_df_pval, dx_name ~ date, value.var="pvalue")
+obj3_mat_pval <- as.matrix(obj3_pval[, -1])
+rownames(obj3_mat_pval) <- obj3_pval[, 1]
+
+#keep only diagnoses with accurate enough RMSPEs
+master_pvalues <- as.data.frame(obj3_mat_pval[rownames(obj3_mat_pval) %in% accurate_dx_list, ])
+```
+
+```{r}
+write.csv(master_pvalues, 'modeling-analysis/dx-entity-deviation-pvalues.csv')
+```
+
+### Adjusted p-values
+```{r}
+#apply FDR correction to p-values to adjust for multiple comparisons within each dx entity
+master_pvaluesAdj <- data.frame(t(apply(master_pvalues, 1, p.adjust, method = "fdr")))
+colnames(master_pvaluesAdj) <- c("Jan 2020", "Feb 2020", "Mar 2020", "Apr 2020", "May 2020", "Jun 2020", "Jul 2020", "Aug 2020", "Sep 2020", "Oct 2020", "Nov 2020", "Dec 2020", "Jan 2021", "Feb 2021", "Mar 2021", "Apr 2021", "May 2021", "Jun 2021", "Jul 2021", "Aug 2021", "Sep 2021", "Oct 2021", "Nov 2021", "Dec 2021")
+```
+
+```{r}
+write.csv(master_pvaluesAdj, 'modeling-analysis/dx-entity-deviation-pvalues-adj.csv')
+```
+
+### Weighted deviances for heatmap shading
+```{r}
+master_devsWeighted <- -log(master_pvaluesAdj) * master_devsOrig
+colnames(master_devsWeighted) <- c("Jan 2020", "Feb 2020", "Mar 2020", "Apr 2020", "May 2020", "Jun 2020", "Jul 2020", "Aug 2020", "Sep 2020", "Oct 2020", "Nov 2020", "Dec 2020", "Jan 2021", "Feb 2021", "Mar 2021", "Apr 2021", "May 2021", "Jun 2021", "Jul 2021", "Aug 2021", "Sep 2021", "Oct 2021", "Nov 2021", "Dec 2021")
+```
+
+### Deviances (non-sigs as zero)
+```{r}
+#create new dataframe of deviance point estimates, with non-sigs as zero, using the adjusted p-values
+#specifically: if the adjusted p-value is > 0.05 for a deviance point estimate, replace the value of the estimate with "zero"
+#will need this dataframe to define the time-to-recovery (TTR) secondary outcome
+
+master_pvaluesAdjBin <- apply(master_pvaluesAdj, c(1,2), function(x) return(ifelse(x < 0.05, 1, 0))) #binary matrix: 1 if the adj p-value < 0.05, 0 otherwise
+master_devs <- master_devsOrig * master_pvaluesAdjBin
+```
+
+## Summary stats for aggregate periods
+```{r}
+all_summarystats <- lapply(obj1, '[[', 16) 
+obj2_summstats <- lapply(1:length(all_summarystats), function(m){all_summarystats[[m]]$summaryDeviations})
+obj2_df_summstats <- as.data.frame(do.call(rbind, obj2_summstats))
+colnames(obj2_df_summstats) <- all_summarystats[[1]]$summaryDevNames
+
+#keep only diagnoses with accurate enough RMSPEs
+master_summarystats <- obj2_df_summstats[obj2_df_summstats$entity_name %in% accurate_dx_list, ]
+```
+
+```{r}
+write.csv(master_summarystats, 'modeling-analysis/dx-entity-quarterly-deviations.csv')
+```
+
+```{r}
+#to allow partitioning by diagnosis category
+icd_df2 <- unique(icd_df[icd_df$DiagnosisEntity %in% accurate_dx_list, c("DiagnosisEntity", "Category")])
+icd_df2 <- icd_df2[order(icd_df2$DiagnosisEntity), ]
+icd_df2$catCode <- factor(icd_df2$Category, labels = LETTERS[1:length(unique(icd_df2$Category))])
+```
+
+```{r}
+dx_legend_df <- as.data.frame(unique(icd_df2[, c("Category", "catCode")]))
+dx_legend_df <- dx_legend_df[order(dx_legend_df$catCode), c("catCode", "Category")]
+colnames(dx_legend_df) <- c("Code", "Category Name")
+dx_legend_df$short_name <- c("Blind", "Cataract", "Cornea/External", "Glaucoma", "Neuro", "Oculoplastics", "OGI", "Other", "PO", "Refra", "Retina/Vitreous", "Strab", "Uveitis")
+dx_legend_df
+```
+
+```{r}
+master_summarystats$meanQ32020 <- as.numeric(master_summarystats$meanQ32020)
+master_summarystats$medianQ32020 <- as.numeric(master_summarystats$medianQ32020)
+master_summarystats$upperboundQ32020 <- as.numeric(master_summarystats$upperboundQ32020)
+master_summarystats$lowerboundQ32020 <- as.numeric(master_summarystats$lowerboundQ32020)
+master_summarystats$pvalEmpricialQ32020 <- as.numeric(master_summarystats$pvalEmpricialQ32020)
+master_summarystats$meanQ42020 <- as.numeric(master_summarystats$meanQ42020)
+master_summarystats$medianQ42020 <- as.numeric(master_summarystats$medianQ42020)
+master_summarystats$upperboundQ42020 <- as.numeric(master_summarystats$upperboundQ42020)
+master_summarystats$lowerboundQ42020 <- as.numeric(master_summarystats$lowerboundQ42020)
+master_summarystats$pvalEmpricialQ42020 <- as.numeric(master_summarystats$pvalEmpricialQ42020)
+master_summarystats$meanQ12021 <- as.numeric(master_summarystats$meanQ12021)
+master_summarystats$medianQ12021 <- as.numeric(master_summarystats$medianQ12021)
+master_summarystats$upperboundQ12021 <- as.numeric(master_summarystats$upperboundQ12021)
+master_summarystats$lowerboundQ12021 <- as.numeric(master_summarystats$lowerboundQ12021)
+master_summarystats$pvalEmpricialQ12021 <- as.numeric(master_summarystats$pvalEmpricialQ12021)
+master_summarystats$meanQ22021 <- as.numeric(master_summarystats$meanQ22021)
+master_summarystats$medianQ22021 <- as.numeric(master_summarystats$medianQ22021)
+master_summarystats$upperboundQ22021 <- as.numeric(master_summarystats$upperboundQ22021)
+master_summarystats$lowerboundQ22021 <- as.numeric(master_summarystats$lowerboundQ22021)
+master_summarystats$pvalEmpricialQ22021 <- as.numeric(master_summarystats$pvalEmpricialQ22021)
+master_summarystats$meanQ32021 <- as.numeric(master_summarystats$meanQ32021)
+master_summarystats$medianQ32021 <- as.numeric(master_summarystats$medianQ32021)
+master_summarystats$upperboundQ32021 <- as.numeric(master_summarystats$upperboundQ32021)
+master_summarystats$lowerboundQ32021 <- as.numeric(master_summarystats$lowerboundQ32021)
+master_summarystats$pvalEmpricialQ32021 <- as.numeric(master_summarystats$pvalEmpricialQ32021)
+master_summarystats$meanQ42021 <- as.numeric(master_summarystats$meanQ42021)
+master_summarystats$medianQ42021 <- as.numeric(master_summarystats$medianQ42021)
+master_summarystats$upperboundQ42021 <- as.numeric(master_summarystats$upperboundQ42021)
+master_summarystats$lowerboundQ42021 <- as.numeric(master_summarystats$lowerboundQ42021)
+master_summarystats$pvalEmpricialQ42021 <- as.numeric(master_summarystats$pvalEmpricialQ42021)
+master_summarystats$meanAllpost <- as.numeric(master_summarystats$meanAllpost)
+master_summarystats$medianAllpost <- as.numeric(master_summarystats$medianAllpost)
+master_summarystats$upperboundAllpost <- as.numeric(master_summarystats$upperboundAllpost)
+master_summarystats$lowerboundAllpost <- as.numeric(master_summarystats$lowerboundAllpost)
+master_summarystats$pvalEmpricialAllpost <- as.numeric(master_summarystats$pvalEmpricialAllpost)
+master_summarystats <- merge(master_summarystats, icd_df2, by.x = "entity_name", by.y = "DiagnosisEntity")
+master_summarystats$rn <- as.numeric(rownames(master_summarystats))
+
+master_summarystats$Q32020w <- master_summarystats$meanQ32020 * -log(master_summarystats$pvalEmpricialQ32020)
+master_summarystats$Q42020w <- master_summarystats$meanQ42020 * -log(master_summarystats$pvalEmpricialQ42020)
+master_summarystats$Q12021w <- master_summarystats$meanQ12021 * -log(master_summarystats$pvalEmpricialQ12021)
+master_summarystats$Q22021w <- master_summarystats$meanQ22021 * -log(master_summarystats$pvalEmpricialQ22021)
+master_summarystats$Q32021w <- master_summarystats$meanQ32021 * -log(master_summarystats$pvalEmpricialQ32021)
+master_summarystats$Q42021w <- master_summarystats$meanQ42021 * -log(master_summarystats$pvalEmpricialQ42021)
+
+master_devsOrig$entity_name <- rownames(master_devsOrig)
+master_devsWeighted$entity_name <- rownames(master_devsWeighted)
+
+master_summarystats <- merge(master_summarystats, master_devsOrig[, c("entity_name", "2020-04-01")], by.x = "entity_name", by.y = "entity_name")
+master_summarystats <- merge(master_summarystats, master_devsWeighted[, c("entity_name", "Apr 2020")], by.x = "entity_name", by.y = "entity_name")
+master_summarystats <- merge(master_summarystats, df_models[, c("Diagnosis Name", "RMSPE", "mean_monthly_pts", "median_monthly_pts")], by.x = "entity_name", by.y = "Diagnosis Name", all.x = TRUE)
+master_summarystats <- merge(master_summarystats, dx_legend_df[, c("Code", "short_name")], by.x = "catCode", by.y = "Code", all.x = TRUE)
+
+master_summarystats$RMSPE <- as.numeric(master_summarystats$RMSPE)
+master_summarystats$mean_monthly_pts <- as.numeric(master_summarystats$mean_monthly_pts)
+master_summarystats$median_monthly_pts <- as.numeric(master_summarystats$median_monthly_pts)
+```
+
+# Main figures (aside from Figure 1)
+
+## FIGURE 2
+
+### 2A-2D: Time series of non-severe Big 4 eye conditions  
+```{r}
+eObjFig2a <- elasticities("dry AMD, early stage", master_dx_df)
+fig2a_df <- as.data.frame(eObjFig2a[[8]])
+fig2a_df$date <- as.Date(fig2a_df$date)
+```
+
+```{r}
+fig2a <- ggplot(fig2a_df) +
+  geom_line(aes(x = date, y = Y, col ='Observed')) +
+  geom_line(aes(x = date, y = predicted, col = 'Predicted')) +
+  geom_ribbon(aes(x = date, ymin = lowerPI, ymax = upperPI, fill = 'Predicted', color = 'Predicted'),  alpha = 0.15, show.legend = F) +
+  geom_ribbon(aes(x = date, ymin = lowerPI, ymax = upperPI, fill = 'Predicted'), alpha = 0.15, show.legend = T) +
+  xlab("Month of Diagnosis Documentation") + 
+  ylab("Number of Patients") + 
+  ggtitle("Dry AMD, early-stage") + 
+  scale_color_manual("", breaks = c("Observed", "Predicted"), values = c('darkorchid4', 'darkcyan')) + 
+  scale_fill_manual("", values = c('Observed' = 'grey', 'Predicted' = 'darkcyan')) + 
+  geom_vline(xintercept = as.Date('2020-01-01'), size = 0.7) +
+  theme_classic(base_size = 9.5)
+```
+
+```{r}
+eObjFig2b <- elasticities("NPDR w/o DME", master_dx_df)
+fig2b_df <- as.data.frame(eObjFig2b[[8]])
+fig2b_df$date <- as.Date(fig2b_df$date)
+```
+
+```{r}
+fig2b <- ggplot(fig2b_df) +
+  geom_line(aes(x = date, y = Y, col ='Observed')) +
+  geom_line(aes(x = date, y = predicted, col = 'Predicted')) +
+  geom_ribbon(aes(x = date, ymin = lowerPI, ymax = upperPI, fill = 'Predicted', color = 'Predicted'),  alpha = 0.15, show.legend = F) +
+  geom_ribbon(aes(x = date, ymin = lowerPI, ymax = upperPI, fill = 'Predicted'), alpha = 0.15, show.legend = T) +
+  xlab("Month of Diagnosis Documentation") + 
+  ylab("Number of Patients") + 
+  ggtitle("NPDR w/o DME") + 
+  scale_color_manual("", breaks = c("Observed", "Predicted"), values = c('darkorchid4', 'darkcyan')) + 
+  scale_fill_manual("", values = c('Observed' = 'grey', 'Predicted' = 'darkcyan')) + 
+  geom_vline(xintercept = as.Date('2020-01-01'), size = 0.7) +
+  theme_classic(base_size = 9.5)
+```
+
+```{r}
+eObjFig2c <- elasticities("cataract, age-related", master_dx_df)
+fig2c_df <- as.data.frame(eObjFig2c[[8]])
+fig2c_df$date <- as.Date(fig2c_df$date)
+```
+
+```{r}
+fig2c <- ggplot(fig2c_df) +
+  geom_line(aes(x = date, y = Y, col ='Observed')) +
+  geom_line(aes(x = date, y = predicted, col = 'Predicted')) +
+  geom_ribbon(aes(x = date, ymin = lowerPI, ymax = upperPI, fill = 'Predicted', color = 'Predicted'),  alpha = 0.15, show.legend = F) +
+  geom_ribbon(aes(x = date, ymin = lowerPI, ymax = upperPI, fill = 'Predicted'), alpha = 0.15, show.legend = T) +
+  xlab("Month of Diagnosis Documentation") + 
+  ylab("Number of Patients") + 
+  ggtitle("Age-related cataract") + 
+  scale_color_manual("", breaks = c("Observed", "Predicted"), values = c('darkorchid4', 'darkcyan')) + 
+  scale_fill_manual("", values = c('Observed' = 'grey', 'Predicted' = 'darkcyan')) + 
+  geom_vline(xintercept = as.Date('2020-01-01'), size = 0.7) +
+  theme_classic(base_size = 9.5)
+```
+
+```{r}
+eObjFig2d <- elasticities("glaucoma, suspect", master_dx_df)
+fig2d_df <- as.data.frame(eObjFig2d[[8]])
+fig2d_df$date <- as.Date(fig2d_df$date)
+```
+
+```{r}
+fig2d <- ggplot(fig2d_df) +
+  geom_line(aes(x = date, y = Y, col ='Observed')) +
+  geom_line(aes(x = date, y = predicted, col = 'Predicted')) +
+  geom_ribbon(aes(x = date, ymin = lowerPI, ymax = upperPI, fill = 'Predicted', color = 'Predicted'),  alpha = 0.15, show.legend = F) +
+  geom_ribbon(aes(x = date, ymin = lowerPI, ymax = upperPI, fill = 'Predicted'), alpha = 0.15, show.legend = T) +
+  xlab("Month of Diagnosis Documentation") + 
+  ylab("Number of Patients") + 
+  ggtitle("Suspect glaucoma") + 
+  scale_color_manual("", breaks = c("Observed", "Predicted"), values = c('darkorchid4', 'darkcyan')) + 
+  scale_fill_manual("", values = c('Observed' = 'grey', 'Predicted' = 'darkcyan')) + 
+  geom_vline(xintercept = as.Date('2020-01-01'), size = 0.7) +
+  theme_classic(base_size = 9.5)
+```
+
+```{r, fig.width=4, fig.height=2}
+fig2 <- ggarrange(fig2a + rremove("axis.title"), fig2b + rremove("axis.title"), fig2c + rremove("axis.title"), fig2d + rremove("axis.title"), labels = c("A", "B", "C", "D"),
+          common.legend = TRUE, 
+          legend = "top")
+annotate_figure(fig2, left = text_grob("Number of patients", rot = 90, size = 10), bottom = text_grob("Month of diagnosis documentation", size = 10))
+```
+
+### 2E: Heatmap of non-severe Big 4 eye conditions  
+
+```{r}
+col_fun_fig2e = colorRamp2(c(-4, 0, 4), c("#de425b", "#eeeeee", "#21a6db"))
+col_fun_fig2e(seq(-3, 3))
+```
+
+```{r}
+fig2edxlist <- c("glaucoma, suspect", "cataract, age-related", "NPDR w/o DME", "dry AMD, early stage")
+fig2edata <- master_devsWeighted[rownames(master_devsWeighted) %in% fig2edxlist, c(1:24)]
+fig2edataNums <- master_devsOrig[rownames(master_devsOrig) %in% fig2edxlist, c(1:24)]
+```
+
+```{r, fig.asp = 0.2}
+fig2hm <- Heatmap(as.matrix(fig2edata), 
+        row_names_gp = grid::gpar(fontsize = 8),
+        column_names_gp = grid::gpar(fontsize = 8),
+        row_gap = unit(2, "mm"),
+        row_order = c("dry AMD, early stage", "NPDR w/o DME", "cataract, age-related", "glaucoma, suspect"),
+        column_names_rot = 90,
+        cluster_row_slices = FALSE, 
+        cluster_columns = F, 
+        cluster_rows = F,
+        col = col_fun_fig2e, 
+        rect_gp = gpar(col = "dark grey", lwd = 2),
+        heatmap_legend_param = list(title = "", title_gp = gpar(fontsize = 8, fontface = 'bold'), direction = "horizontal", labels_gp = gpar(fontsize = 8), labels = c(expression(-delta*"*"), "", "", "", expression(+delta*"*"))),
+        cell_fun = function(j, i, x, y, width, height, fill) {
+        grid.text(format(as.numeric(sprintf("%.2f", fig2edataNums[i, j])), nsmall = 2), x, y, gp = gpar(fontsize = 8))}
+        )
+ComplexHeatmap::draw(fig2hm, heatmap_legend_side = "top") 
+```
+  
+```{r}
+library(gridExtra)
+grobFig2 <- annotate_figure(fig2, left = text_grob("Number of patients", rot = 90, size = 10), bottom = text_grob("Month of diagnosis documentation", size = 10))
+grobFig2_final <- grid.grabExpr(ComplexHeatmap::draw(fig2hm, heatmap_legend_side = "bottom"))
+Fig2label <- textGrob("E", x = unit(0.032, "npc"), y = unit(0.5, "npc"), just = "left", gp = gpar(fontsize = 14, fontface = 'bold'))
+```
+
+```{r}
+pdf(file="main-figures/figure-2.pdf", width = 9.5, height = 6)
+
+grid.draw(grid.arrange(grobFig2, Fig2label, grobFig2_final,
+                   widths = c(0.08, 1.25),
+                   heights = c(4, 0.15, 2.25),
+                   layout_matrix = rbind(c(1),
+                                         c(2),
+                                         c(NA, 3))))
+
+dev.off()
+```
+
+
+## FIGURE 3
+
+### 3A: Overall & guide to interpretation
+```{r}
+fig3a <- ggplot(master_summarystats, aes(x = meanAllpost, y = `2020-04-01`)) + geom_point(color = "red", alpha = 0.3) + labs(title = "Deviations over time for all diagnosis entities", y = "Deviation from Expectation, Apr '20", x = "Deviation from Expectation, Jun '20 - Dec '21") + geom_abline(intercept = 0, slope = 1, color="grey", linetype="dashed") + geom_vline(xintercept = 0) + geom_hline(yintercept = 0) + stat_ellipse(color = "red") + scale_x_continuous(limits = c(-1, 1)) + scale_y_continuous(limits = c(-1, 1)) + geom_label(x = 0.5, y = 0.5, label = "Consistently above expectation") + geom_label(x = -0.5, y = 0.5, label = "Above expectation during hiatus \n Below expectation post-hiatus") + geom_label(x = -0.5, y = -0.5, label = "Consistently below expectation") + geom_label(x = 0.5, y = -0.5, label = "Below expectation during hiatus \n Above expectation post-hiatus") + annotate("text", x=0, y=0.05, label="equal deviation over time", color = "darkgrey", angle = 20) + theme_bw() #+ annotate("text", x = 0.5, y = -0.95, label = "Full rebound", color = "blue") + annotate("text", x = -0.5, y = -0.95, label = "Partial rebound", color = "blue")
+fig3a
+```
+
+### 3B: Categories
+```{r}
+all_sp_df3 <- aggregate(master_summarystats[,c('meanAllpost', '2020-04-01')], list(master_summarystats$Category), mean)
+all_sp_df3_size <- aggregate(master_summarystats[,c('mean_monthly_pts')], list(master_summarystats$Category), sum)
+all_sp_df3 <- merge(all_sp_df3, all_sp_df3_size, by.x = "Group.1", by.y = "Group.1")
+colnames(all_sp_df3) <- c("DiagnosisCategory", "PostSpr2020_wtd", "Apr2020", "TotalVolume")
+#View(all_sp_df3)
+```
+
+```{r}
+mean(all_sp_df3$Apr2020) #-0.6862129
+sd(all_sp_df3$Apr2020) #0.1158075
+mean(all_sp_df3$PostSpr2020_wtd) #-0.1242949
+sd(all_sp_df3$PostSpr2020_wtd) #0.03395956
+```
+
+```{r}
+mean(master_summarystats$`2020-04-01`) 
+sd(master_summarystats$`2020-04-01`)
+mean(master_summarystats$meanAllpost) 
+sd(master_summarystats$meanAllpost) 
+```
+```{r, fig.width=5, fig.height=2}
+fig3b <- ggplot(all_sp_df3, aes(x = PostSpr2020_wtd, y = Apr2020, label = DiagnosisCategory)) +
+  labs(title = "Average deviations over time by diagnosis category", 
+       y ="Deviation from Expectation, Apr '20", 
+       x = "Deviation from Expectation, Jun '20 - Dec '21") + 
+  geom_point(aes(size = TotalVolume), alpha = 1, show.legend = T, color = "#F2B5FC")  +
+  geom_point(aes(alpha = ""), x = -0.1274905, y = -0.6652164, color = "blue", fill = "lightblue", shape = 23, size = 3) +
+  geom_vline(xintercept = 0) +
+  geom_hline(yintercept = 0) +
+  geom_abline(intercept = 0, slope = 1, color="grey", linetype="dashed") +
+  geom_text_repel(max.overlaps = Inf, size = 3, box.padding = 0.8, force_pull = -0.005, min.segment.length = 0, segment.alpha = 0.3) +
+  scale_x_continuous(expand = expansion(mult = 0.5)) +
+  scale_y_continuous(expand = expansion(mult = 0.5)) +
+  scale_size_area(name = "Total patient volume", breaks = c(250000, 500000, 750000, 1000000)) +
+  theme_bw() +
+  theme(legend.position = "bottom") +
+  guides(alpha = guide_legend(title = "All diagnosis entities (mean)", 
+                              override.aes = list(color = "blue", fill = "lightblue", shape = 23, size = 3),
+                              label.theme = element_text(size = 10)),
+         size = guide_legend(title = "Total patient volume",
+                             override.aes = list(label = "")))
+fig3b
+```
+
+```{r}
+pdf(file="main-figures/figure-3.pdf", width = 8.5, height = 8, onefile = FALSE)
+
+ggarrange(ggplotGrob(ggdraw(fig3a)), ggplotGrob(fig3b), ncol = 1, nrow = 2, labels = c("A", "B"), heights = c(0.7, 1))
+
+dev.off()
+```
+
+## FIGURE 4
+
+### 4A: Big 4 Conditions
+```{r}
+vehss_dx_list <- as.list(unique(vehss_idx$DiagnosisEntity))
+big4_dx_list <- unlist(unique(c(unique(icd_df[icd_df$Category == 'Glaucoma', 'Diagnosis.Name']), unique(icd_df[icd_df$Category == 'Cataract and other lens disorders', 'Diagnosis.Name']), vehss_dx_list)))
+big4_sp_df <- master_summarystats[master_summarystats$entity_name %in% big4_dx_list, ]
+
+big4_sp_df <- merge(big4_sp_df, vehss_idx[, c(1,2)], by.x = "entity_name", by.y = "DiagnosisEntity", all.x = TRUE)
+big4_sp_df$dx_category_final <- ifelse(big4_sp_df$Category == "Retinal and vitreous conditions", big4_sp_df$Big4Category, big4_sp_df$Category)
+
+fig4excldxlist <- c("iridodialysis", "DME resolved after tx", "glaucoma, absolute", "glaucoma, PXG", "aphakia", "wet AMD, inactive scar", "lens dislocation", "PDR, stable", "IOL displacement")
+```
+
+```{r, fig.width=5, fig.height=2}
+fig4a <- ggplot(big4_sp_df[big4_sp_df$entity_name %in% accurate_dx_list, ], aes(x = meanAllpost, y = `2020-04-01`, color = dx_category_final, label = ifelse(stringr::str_detect(entity_name, "other|unspec") | nchar(entity_name) > 25 | entity_name %in% fig4excldxlist, "", entity_name), size = mean_monthly_pts)) + geom_point(alpha = 0.4) + geom_text_repel(max.overlaps = Inf, size = 3, box.padding = 0.15, segment.alpha = 0.4, min.segment.length = 0, force_pull = -0.0075, force = 3) + geom_vline(xintercept = 0) + geom_hline(yintercept = 0) + geom_abline(intercept = 0, slope = 1, color="grey", linetype="dashed") + guides(color = guide_legend(override.aes = aes(label = ""), order = 1)) + scale_size_area() + labs(title = "Deviations over time for common eye diseases: DR, AMD, cataract, glaucoma", y = "Deviation from Expectation, Apr '20", x = "Deviation from Expectation, Jun '20 - Dec '21", size = "Average monthly volume", color = "Diagnosis category") + annotate("text", x=-0.5, y=-0.05, label="r = 0.025", size = 3.25, col = 'blue') + theme_bw() #+ scale_x_continuous(expand = expansion(mult = 0.1), limits = c(-0.6, 0.4)) + + scale_y_continuous(expand = expansion(mult = 0.1)) 
+```
+
+```{r}
+cor.test(big4_sp_df[big4_sp_df$entity_name %in% accurate_dx_list, 'meanAllpost'], big4_sp_df[big4_sp_df$entity_name %in% accurate_dx_list, '2020-04-01'])
+```
+
+```{r}
+View(big4_sp_df[big4_sp_df$dx_category_final == 'AMD', c('entity_name', '2020-04-01', 'meanAllpost')])
+```
+
+### 4B: Neuro-ophthalmic diseases
+```{r}
+neurooph_sp_df <-  master_summarystats[master_summarystats$Category == 'Neuro-ophthalmology', ]
+```
+
+```{r, fig.width=5, fig.height=2.25}
+fig4b <- ggplot(neurooph_sp_df, aes(x = meanAllpost, y = `2020-04-01`, label = ifelse(stringr::str_detect(entity_name, "other|unspec"), "", entity_name), size = mean_monthly_pts)) + geom_point(color = 'lightpink') + geom_text_repel(max.overlaps = Inf, size = 3, box.padding = 0.75, segment.alpha = 0.3, min.segment.length = 0, force_pull = 0, force = 1) + geom_vline(xintercept = 0) + geom_hline(yintercept = 0) + geom_abline(intercept = 0, slope = 1, color="grey", linetype="dashed") + scale_size_area() + labs(title = "Deviations over time for neuro-ophthalmic conditions", y = "Deviation from Expectation, Apr '20", x = "Deviation from Expectation, Jun '20 - Dec '21", size = "Average monthly volume") + theme_bw() + annotate("text", x=-0.3, y=-0.05, label="r = 0.729", size = 3.25, col = 'blue') 
+```
+
+```{r}
+cor.test(neurooph_sp_df$meanAllpost, neurooph_sp_df$`2020-04-01`)
+```
+```{r}
+View(neurooph_sp_df[, c('entity_name', '2020-04-01', 'meanAllpost')])
+```
+
+```{r}
+pdf(file="main-figures/figure-4.pdf", width = 9, height = 8, onefile = FALSE)
+
+ggarrange(ggplotGrob(ggdraw(fig4a)), ggplotGrob(fig4b), ncol = 1, nrow = 2, labels = c("A", "B"), heights = c(0.5, 0.5))
+
+dev.off()
+```
+
+## FIGURE 5
+```{r}
+mapped_dx_list <- as.list(unique(severity_idx$MAPPED_ENTITY_NAME))
+mapped_dx_list <- mapped_dx_list[mapped_dx_list %in% accurate_dx_list]
+
+obj1_boxplot_b <- master_summarystats[master_summarystats$entity_name %in% mapped_dx_list, c('entity_name', 'meanAllpost', '2020-04-01')]
+obj3_final_b <- merge(obj1_boxplot_b, severity_idx, by.x = 'entity_name', by.y = 'MAPPED_ENTITY_NAME')
+
+fig5Ahyptest <- tidyr::gather(obj3_final_b, timeperiod, deviation, c(meanAllpost,`2020-04-01`), factor_key=TRUE)
+fig5Ahyptest$deviation <- as.numeric(fig5Ahyptest$deviation)
+fig5Ahyptest <- unique(fig5Ahyptest[, c('entity_name', 'MEDIAN_WEIGHT', 'timeperiod', 'deviation')])
+```
+
+### 5A: Ocular emergencies
+
+*Kruskal-Wallis rank sum test:*
+```{r}
+kruskal.test(deviation ~ as.factor(MEDIAN_WEIGHT), data = fig5Ahyptest[fig5Ahyptest$timeperiod == '2020-04-01', ])
+```
+
+```{r}
+kruskal.test(deviation ~ as.factor(MEDIAN_WEIGHT), data = fig5Ahyptest[fig5Ahyptest$timeperiod == 'meanAllpost', ])
+```
+
+*Linear regression:*
+```{r}
+summary(glm(as.numeric(deviation) ~ as.numeric(MEDIAN_WEIGHT), data = fig5Ahyptest[fig5Ahyptest$timeperiod == '2020-04-01', ], family = "gaussian"))
+```
+
+```{r}
+summary(glm(as.numeric(deviation) ~ as.numeric(MEDIAN_WEIGHT), data = fig5Ahyptest[fig5Ahyptest$timeperiod == 'meanAllpost', ], family = "gaussian"))
+```
+
+```{r, fig.width=5, fig.height=2}
+fig5a <- ggplot(fig5Ahyptest, aes(x = as.factor(MEDIAN_WEIGHT), y = as.numeric(deviation), fill = timeperiod)) + geom_boxplot(position = 'dodge') + labs(title = paste('Deviations from expectation vs. condition severity for', length(unique(fig5Ahyptest$entity_name)),'ocular emergencies'), x = 'Severity Index (BaSe SCOrE)', y = 'Deviation from Expectation', fill = "Time period") + scale_fill_manual(labels = c("Jun '20 - Dec '21", "Apr '20"), values = c("lightblue", "lightsalmon")) + ylim(c(-1, 0.25)) + geom_hline(yintercept = 0) + theme_bw()
+
+fig5a <- fig5a + scale_x_discrete(breaks = c(1:5), labels = seq(1, 5, 1)) + geom_bracket(inherit.aes = F, xmin = 0.82, xmax = 4.82, y.position = 0.1, label = "Kruskal-Wallis test, p = 0.05", color = "dark grey", tip.length = 0.02) + geom_bracket(xmin = 1.18, xmax = 5.18, y.position = -0.9, inherit.aes = F, label = "", color = "dark grey", tip.length = -0.02) + annotate("text", label = "Kruskal-Wallis test, p = 0.002", y = -0.865, x = 2.75, color = "dark grey")
+
+fig5a
+```
+
+### 5B: DR, AMD, Glaucoma
+```{r}
+obj1_boxplot_v <- master_summarystats[master_summarystats$entity_name %in% vehss_dx_list, c('entity_name', 'meanAllpost', '2020-04-01')]
+obj3_final_v <- merge(obj1_boxplot_v, vehss_idx, by.x = 'entity_name', by.y = 'DiagnosisEntity')
+
+fig5Bhyptest <- tidyr::gather(obj3_final_v[obj3_final_v$entity_name %in% accurate_dx_list,], timeperiod, deviation, c(meanAllpost,`2020-04-01`), factor_key=TRUE)
+fig5Bhyptest$deviation <- as.numeric(fig5Bhyptest$deviation)
+fig5Bhyptest <- unique(fig5Bhyptest[, c("entity_name", "Big4Category", "Type", "timeperiod", "deviation")])
+```
+
+```{r}
+fig5b <- ggplot(fig5Bhyptest, aes(x = as.factor(Type), y = as.numeric(deviation), fill = timeperiod)) +  facet_wrap(~Big4Category) + geom_boxplot(position = 'dodge') + labs(title = paste('Deviations from expectation vs. VT status for DR, AMD, and glaucoma diagnoses'), x = 'Vision-Threatening Status', y = 'Deviation from Expectation', fill = "Time period") + geom_hline(yintercept = 0) + theme_bw() + scale_fill_manual(labels = c("Jun '20 - Dec '21", "Apr '20"), values = c("lightblue", "lightsalmon"))
+fig5b
+```
+
+```{r}
+fig5Bstattest <- compare_means(deviation ~ Type, data = fig5Bhyptest, group.by = c('Big4Category', 'timeperiod'))
+fig5Bstattest <- fig5Bstattest[order(fig5Bstattest$Big4Category), ]
+fig5Bstattest
+```
+
+```{r}
+plabels <- data.frame(
+  Big4Category = as.factor(c("AMD", "AMD", "DR", "DR", "Glaucoma", "Glaucoma")),
+  labels = c("p = 0.06", "p = 0.56", "p = 0.03", "p = 0.89", "p = 0.01", "p = 0.09"),
+  timeperiod = c("2020-04-01", "meanAllpost", "2020-04-01", "meanAllpost", "2020-04-01", "meanAllpost"),
+  xmins = c(1.18, 0.82, 1.18, 0.82, 1.18, 0.82),
+  xmaxs = c(2.18, 1.82, 2.18, 1.82, 2.18, 1.82),
+  ypos = c(-0.275, 0.05, -0.35, 0.10, -0.5, 0.05)
+)
+```
+
+```{r, fig.width=5, fig.height=2}
+fig5b <- fig5b + geom_bracket(data = plabels,
+                    mapping = aes(xmin = xmins, xmax = xmaxs, y.position = ypos, label = labels),
+                    color = "dark grey",
+                    tip.length = 0.015) + guides(color = F)
+fig5b
+```
+
+```{r}
+pdf(file="main-figures/figure-5.pdf", width = 9, height = 8, onefile = FALSE)
+
+ggarrange(fig5a, fig5b, ncol = 1, nrow = 2, labels = c("A", "B"), heights = c(0.5, 0.5), common.legend = T, legend = "bottom")
+
+dev.off()
+```
+
+## FIGURE 6
+
+### Time to recovery
+```{r}
+ttr_func <- function(entity_name, input_df){ #inputs: name of the dx entity, and the master_devs df
+  
+  df <- input_df[rownames(input_df) == entity_name, ] #extract the row of the master_devs df for the dx entity
+  df_long <- df %>% gather(timepoint) #wide to long format: three cols now: `entity_name`, `timepoint`, `value` (deviation)
+  df_long <- df_long[df_long$value >= 0, ] #only keep timepoints where `value` is >= 0
+  tp_indicies <- as.numeric(rownames(df_long[df_long$value >= 0, ])) #extract the study month number(s)
+  tp_indicies <- tp_indicies[tp_indicies > 5] #only consider June 2020 and afterwards
+  
+  #only keep contiguous intervals of recovery (among the study month numbers) greater than or equal to 3 
+  res_df <- as.data.frame(seqToIntervals(tp_indicies)) #return contiguous intervals for a vector of indicies
+  res_df$diff <-  res_df$to - res_df$from + 1
+  res_df <- res_df[res_df$diff >= 3, ]
+  
+  #the earliest month in which the `value` reaches 0 (i.e., the entity recovers) is stored in `recovered_month`; if there are no such intervals in `res_df`, then 'No recovery' is stored in `recovered_month`
+  recovered_month <- ifelse(nrow(res_df) == 0, 'No recovery', head(res_df[res_df$diff >= 3, 'from'], 1))
+
+  #determine full vs. partial recovery
+  ##(1) does `res_df` have at least one row
+  ##(2) is there only one interval in `res_df`, and does it have the same start and end time?
+  ##(3) does this interval in `res_df` end at pandemic study month #24 (i.e., Dec 2021)?
+  if(nrow(res_df) != 0 && (head(res_df[, 'from'], 1) == tail(head(res_df[, 'from'], 1))) && (tail(head(res_df[, 'to'], 1) == 24))){
+    fullRecovery <- TRUE
+  }
+  else {
+    fullRecovery <- FALSE
+  }
+  
+  #return the `recovered_month` and a boolean value indicating whether the recovery was full or partial
+  res <- list(recovered_month, fullRecovery)
+  return(res) 
+  
+}
+```
+
+```{r}
+master_summarystats$recoveredMonth <- unlist(lapply(lapply(as.list(master_summarystats$entity_name), ttr_func, master_devs), '[[', 1))
+
+master_summarystats$fullRecovery <- unlist(lapply(lapply(as.list(master_summarystats$entity_name), ttr_func, master_devs), '[[', 2))
+
+master_summarystats$recoveredMonthNum <- ifelse(master_summarystats$recoveredMonth == 'No recovery', 0, as.numeric(master_summarystats$recoveredMonth))
+```
+
+```{r}
+#quality check
+sum(is.na(master_summarystats$recoveredMonthNum)) #0
+sum(is.na(master_summarystats$fullRecovery)) #0
+sum(is.na(master_summarystats$recoveredMonth)) #0
+```
+
+### Adjusted p-values for quarterly deviations
+```{r}
+quarterly_pvals <- master_summarystats[, c('pvalEmpricialQ32020', 'pvalEmpricialQ42020', 'pvalEmpricialQ12021', 'pvalEmpricialQ22021', 'pvalEmpricialQ32021', 'pvalEmpricialQ42021')]
+rownames(quarterly_pvals) <- master_summarystats$entity_name
+colnames(quarterly_pvals) <- c('unadj.pval_Q32020', 'unadj.pval_Q42020', 'unadj.pval_Q12021', 'unadj.pval_Q22021', 'unadj.pval_Q32021', 'unadj.pval_Q42021')
+quarterly_adjpvals <- as.data.frame(t(apply(quarterly_pvals, 1, p.adjust, method = "fdr")))
+colnames(quarterly_adjpvals) <- c('adj.pval_Q32020', 'adj.pval_Q42020', 'adj.pval_Q12021', 'adj.pval_Q22021', 'adj.pval_Q32021', 'adj.pval_Q42021')
+quarterly_adjpvals$entity_name <- rownames(quarterly_adjpvals)
+master_summarystats <- merge(master_summarystats, quarterly_adjpvals, by = 'entity_name')
+
+master_summarystats$Q32020w_adj <- master_summarystats$meanQ32020 * -log(master_summarystats$adj.pval_Q32020)
+master_summarystats$Q42020w_adj <- master_summarystats$meanQ42020 * -log(master_summarystats$adj.pval_Q42020)
+master_summarystats$Q12021w_adj <- master_summarystats$meanQ12021 * -log(master_summarystats$adj.pval_Q12021)
+master_summarystats$Q22021w_adj <- master_summarystats$meanQ22021 * -log(master_summarystats$adj.pval_Q22021)
+master_summarystats$Q32021w_adj <- master_summarystats$meanQ32021 * -log(master_summarystats$adj.pval_Q32021)
+master_summarystats$Q42021w_adj <- master_summarystats$meanQ42021 * -log(master_summarystats$adj.pval_Q42021)
+```
+
+```{r}
+write.csv(master_summarystats, 'modeling-analysis/dx-entity-quarterly-devs-and-recovery.csv')
+```
+
+```{r}
+#for circos ordering
+master_summarystats$short_name <- as.factor(master_summarystats$short_name)
+#View(master_summarystats[, c("Q32020w", "Q32020w_adj", "Q42020w", "Q42020w_adj", "Q12021w", "Q12021w_adj", "Q22021w", "Q22021w_adj", "Q32021w", "Q32021w_adj", "Q42021w", "Q42021w_adj")])
+```
+
+
+### Circos plot
+```{r}
+circos.clear()
+
+pdf(file="main-figures/figure-6.pdf")
+
+#1. graphical parameters
+circos.par("start.degree" = 90, #the starting degree where the first sector is put (polar coordinate system)
+           cell.padding = c(0, 0, 0, 0), #bottom, left, top and right padding of the cell
+           gap.degree = 1, #gap between two neighboring sectors; single value = same gap btwn all sectors
+           points.overflow.warning = FALSE,
+           gap.after = c(rep(2, 12), 10))
+
+#2. allocate sectors on the circle
+circos.heatmap.initialize(master_summarystats[, rev(c("Q32020w_adj", "Q42020w_adj", "Q12021w_adj", "Q22021w_adj", "Q32021w_adj", "Q42021w_adj"))], split = master_summarystats$short_name)
+
+#3. create plotting regions for cells, starting from outermost to innermost tracks:
+
+## TRACK 1: RMSPEs
+circos.track(ylim = c(0, 0.125),
+             bg.border = NA,
+             panel.fun = function(x, y){
+                  x = master_summarystats$rn[CELL_META$subset]
+                  x = x[CELL_META$row_order]
+                  y = master_summarystats$RMSPE[CELL_META$subset] 
+                  y = y[CELL_META$row_order]
+                  circos.lines(CELL_META$cell.xlim, c(0, 0), col = "black", cex = .6)
+                  circos.barplot(value = y, pos = seq_along(x) - 0.5, col = case_when(y <= 0.05 ~ '#e8be27', 
+                                                                                      y > 0.05 & y < 0.10 ~ '#f5e890', 
+                                                                                      TRUE ~ 'light grey'), border = NA)
+               }
+             )
+
+set_track_gap(cm_h(0.25))
+
+## TRACK 2: heatmaps of quarterly deviations post-hiatus (weighted by alpha)
+circos.heatmap(master_summarystats[, rev(c("Q32020w_adj", "Q42020w_adj", "Q12021w_adj", "Q22021w_adj", "Q32021w_adj", "Q42021w_adj"))], 
+               col = colorRamp2(c(-4, 0, 4), c("#de425b", "#eeeeee", "#21a6db")), 
+               show.sector.labels = FALSE,
+               cluster = TRUE)
+
+## TRACK 2B: heatmap "y-axis" labels
+circos.track(track.index = get.current.track.index(), panel.fun = function(x, y) {
+    if(CELL_META$sector.numeric.index == 1) { # place before the first sector
+        cn = c("Q3'20", "Q4'20", "Q1'21", "Q2'21", "Q3'21", "Q4'21")
+        n = length(cn)
+        circos.text(rep(CELL_META$cell.xlim[1], n) + convert_x(-7.5, "mm"),
+            1:n - 0.5, cn,
+            cex = 0.5, adj = c(0, 0.5), facing = "inside", niceFacing = TRUE)
+    }
+}, bg.border = NA)
+
+
+## TRACK 1.5: diagnosis category labels 
+circos.track(track.index = 2,
+             track.margin = c(0, mm_h(2)),
+             bg.border = NA,
+             panel.fun = function(x, y) {
+                circos.text(CELL_META$xcenter, CELL_META$cell.ylim[2] + convert_y(0.5, "mm"),
+                            paste0(CELL_META$sector.index),
+                            facing = "bending.inside", cex = 0.7,
+                            adj = c(0.5, 0), niceFacing = TRUE)}
+             )
+
+set_track_gap(cm_h(0.05))
+
+## TRACK 3: heatmap of April 2020 deviations (raw, unweighted)
+
+circos.heatmap(master_summarystats[, rev(c("2020-04-01"))], track.height = mm_h(2.5),
+               col = colorRamp2(c(min(master_summarystats$`2020-04-01`), max(master_summarystats$`2020-04-01`)), c("#3f007d", "#fcfbfd")))
+
+### TRACK 3B: heatmap "y-axis" label
+circos.track(track.index = get.current.track.index(), panel.fun = function(x, y) {
+    if(CELL_META$sector.numeric.index == 1) { # place before the first sector
+        cn = "Hiatus"
+        n = length(cn)
+        circos.text(rep(CELL_META$cell.xlim[1], n) + convert_x(-6, "mm"),
+            1:n - 0.5, cn,
+            cex = 0.455, adj = c(0, 0.5), facing = "inside", niceFacing = TRUE)
+    }
+}, bg.border = NA)
+
+
+## TRACK 4: barplots of time-to-recovery
+circos.track(ylim = c(-21, 0),
+             bg.border = NA,
+             panel.fun = function(x, y){
+                  x = master_summarystats$rn[CELL_META$subset]
+                  x = x[CELL_META$row_order]
+                  y = master_summarystats$recoveredMonthNum[CELL_META$subset] * -1
+                  y = y[CELL_META$row_order]
+                  r = master_summarystats$fullRecovery[CELL_META$subset]
+                  r = r[CELL_META$row_order]
+                  circos.lines(CELL_META$cell.xlim, c(0, 0), col = "black", cex = .6)
+                  circos.barplot(value = y,
+                                 pos = seq_along(x) - 0.5,
+                                 col = ifelse(r == T, '#66c2a4', '#b2e2e2'),
+                                 border = NA)
+               }
+             )
+
+circos.yaxis(side = "left", sector.index = "Blind", labels.cex = 0.35, lwd = 0.5, at = c(0, -6, -12, -18, -21), labels = c(0, 6, 12, 18, 21))
+
+## LEGENDS
+lgd_trk1 = ComplexHeatmap::Legend(title = "Model performance error", title_gp = gpar(fontsize = 8, fontface = 'bold'), at = c("Below 5%", "5-10%", "10-12.5%"), legend_gp = gpar(fill = c('#e8be27','#f5e890', 'light grey')), labels_gp = gpar(fontsize = 7))
+
+lgd_trk2 = ComplexHeatmap::Legend(title = "Post-hiatus deviation", title_gp = gpar(fontsize = 8, fontface = 'bold'), at = c(-4, -2, 0, 2, 4), labels = c(expression(-delta*"*"), "", "", "", expression(+delta*"*")), col_fun = colorRamp2(c(-4, 0, 4), c("#de425b", "#eeeeee", "#21a6db")), direction = 'horizontal', legend_width = unit(3, "cm"), labels_gp = gpar(fontsize = 7))
+
+lgd_trk3 = ComplexHeatmap::Legend(title = "Apr 2020 decrease",
+                                  border = "gray85",
+                                  title_gp = gpar(fontsize = 8, fontface = 'bold'), 
+                                  at = c(-1, 0), 
+                                  labels = c(expression(delta['max']==-0.91), expression(delta['min']==-0.18)), 
+                                  col_fun = colorRamp2(c(min(master_summarystats$`2020-04-01`), max(master_summarystats$`2020-04-01`)), c("#3f007d", "#fcfbfd")), 
+                                  direction = 'horizontal', legend_width = unit(3, "cm"), labels_gp = gpar(fontsize = 7))
+
+lgd_trk4 = ComplexHeatmap::Legend(title = "Time to recovery", title_gp = gpar(fontsize = 8, fontface = 'bold'), at = c("Partial recovery", "Sustained recovery"), legend_gp = gpar(fill = c('#b2e2e2','#66c2a4')), labels_gp = gpar(fontsize = 7))
+
+lgd_listA = ComplexHeatmap::packLegend(lgd_trk1, lgd_trk4, direction = "vertical", row_gap = unit(2, "mm"))
+lgd_listB = ComplexHeatmap::packLegend(lgd_trk2, lgd_trk3, direction = "vertical", row_gap = unit(2, "mm"))
+
+ComplexHeatmap::draw(lgd_listA, x = unit(0.5, "cm"), y = unit(0.10, "cm"), just = c("left", "bottom"))
+ComplexHeatmap::draw(lgd_listB, x = unit(14, "cm"), y = unit(0.10, "cm"), just = c("left", "bottom"))
+
+dev.off()
+```
+
+# Supplemental / exploratory figures
+
+### FIGURE S1: Deviations faceted by category
+
+```{r}
+#define a function to compute the mean pairwise Euclidean distance among all points in a cluster
+eucDist <- function(dev1, dev2){
+  
+  df <- as.data.frame(cbind(dev1, dev2))
+  return(mean(dist(df, method = "euclidean")))
+  
+}
+```
+
+```{r}
+master_summarystats$Category <- ifelse(master_summarystats$Category == "Postprocedural or postoperative eye complication", "Postop complications", master_summarystats$Category)
+master_summarystats$Category <- ifelse(master_summarystats$Category == "Oculofacial plastics and orbital conditions", "Oculoplastics and orbital conditions", master_summarystats$Category)
+```
+
+```{r}
+master_summarystats <-
+master_summarystats %>%
+  group_by(Category) %>%
+  mutate(r.squared = cor.test(meanAllpost, `2020-04-01`, method = 'pearson')$estimate,
+         r.pvalue = cor.test(meanAllpost, `2020-04-01`, method = 'pearson')$p.value,
+         r.squaredK = cor.test(meanAllpost, `2020-04-01`, method = 'kendall')$estimate,
+         r.pvalueK = cor.test(meanAllpost, `2020-04-01`, method = 'kendall')$p.value,
+         r.squaredS = cor.test(meanAllpost, `2020-04-01`, method = 'spearman')$estimate,
+         r.pvalueS = cor.test(meanAllpost, `2020-04-01`, method = 'spearman')$p.value,
+         eucdist = eucDist(meanAllpost, `2020-04-01`))
+
+#View(unique(master_summarystats[, c("Category", "r.squared", "r.pvalue", "r.squaredK", "r.pvalueK", "r.squaredS", "r.pvalueS")]))
+```
+
+```{r}
+text_r.sq <- unique(master_summarystats[, c("Category", "r.squared")])
+text_r.sq$x <- -0.57
+text_r.sq$y <- -0.08
+
+text_r.pv <- unique(master_summarystats[, c("Category", "r.pvalue")])
+text_r.pv$x <- -0.575
+text_r.pv$y <- -0.15
+
+text_eucdist <- unique(master_summarystats[, c("Category", "eucdist")])
+text_eucdist$x <- 0.18
+text_eucdist$y <- -0.95
+```
+
+```{r, fig.width=4.5, fig.height=4}
+pdf(file="suppl-figs-tables/figure-s1.pdf", width = 9, height = 8, onefile = FALSE)
+
+ggplot(master_summarystats, aes(x = meanAllpost, y = `2020-04-01`)) + labs(title = "Deviations over time, stratified by diagnosis category", y = "Deviation from Expectation, Apr '20", x = "Deviation from Expectation, Jun '20 - Dec '21") + geom_point(color = "red", alpha = 0.3) + facet_wrap(~Category) + scale_x_continuous(limits = c(-0.75, 0.3)) + scale_y_continuous(limits = c(-1, 0)) + geom_vline(xintercept = 0) + geom_abline(intercept = 0, slope = 1, color="grey", linetype="dashed") + stat_ellipse(color = "red") + geom_hline(yintercept = 0) + geom_text(data = text_r.sq, aes(x = x, y = y, label = paste('r =', round(r.squared, 3))), inherit.aes = F, size = 2.85, col = 'blue') + geom_text(data = text_r.pv, aes(x = x, y = y, label = paste('p =', sprintf("%.3f", round(r.pvalue, 3)))), inherit.aes = F, size = 2.85, col = '#6495ED') + geom_text(data = text_eucdist, aes(x = x, y = y, label = paste('spread', sprintf("%.2f", round(eucdist, 2)))), inherit.aes = F, size = 2.85, col = 'purple') + theme_bw()
+
+dev.off()
+```
+
+### FIGURE S2: Retinal diseases
+```{r}
+retinal_dx_list <- pull(master_summarystats[master_summarystats$Category == 'Retinal and vitreous conditions', 'entity_name']) 
+retinal_dx_list <- retinal_dx_list[!(retinal_dx_list %in% big4_dx_list)]
+  
+retinal_sp_df <- master_summarystats[master_summarystats$entity_name %in% retinal_dx_list, ]
+
+retinal_sp_df <- merge(retinal_sp_df, unique(icd_df[,4:5]), by.x = "entity_name", by.y = "DiagnosisEntity")
+
+retinal_sp_df$entity_name <- ifelse(retinal_sp_df$entity_name == "retinal breaks or defects w/o RD", "RB w/o RD", retinal_sp_df$entity_name)
+
+##View(table(retinal_sp_df$Top10))
+
+retinal_sp_df$Top10New <- ifelse(retinal_sp_df$Top10 == "Other background retinopathy and retinal vascular changes", "Other background retinopathy", retinal_sp_df$Top10)
+retinal_sp_df$Top10New <- ifelse(retinal_sp_df$Top10New == "Retinal defects without detachment" | retinal_sp_df$Top10New == "Serous retinal detachment" | retinal_sp_df$Top10New == "Other forms of retinal detachment" | retinal_sp_df$Top10New == "Retinal detachment with retinal defect" | retinal_sp_df$Top10New == "Retinal detachment with retinal defect", "Retinal detachments", retinal_sp_df$Top10New)
+retinal_sp_df$Top10New <- ifelse(retinal_sp_df$Top10New != "Other background retinopathy" & retinal_sp_df$Top10New != "Retinal detachments" & retinal_sp_df$Top10New != "Disorders of vitreous body" & retinal_sp_df$Top10New != "Retinal vascular occlusion" & retinal_sp_df$Top10New != "Retinopathy of prematurity" & retinal_sp_df$Top10New != "Macular degeneration" & retinal_sp_df$Top10New != "Other retinal disorders" & retinal_sp_df$Top10New != "Separation of retinal layers", "Other retinal disorders", retinal_sp_df$Top10New)
+
+figS2excldxlist <- c("hypertensive retinopathy", "retinal vascular changes", "vitreomacular adhesion")
+```
+
+```{r}
+cor.test(retinal_sp_df[, 'meanAllpost'], retinal_sp_df[, '2020-04-01'])
+```
+
+```{r, fig.width=5, fig.height=2}
+pdf(file="suppl-figs-tables/figure-s2.pdf", width = 9.25, height = 4, onefile = FALSE)
+
+ggplot(retinal_sp_df, aes(x = meanAllpost, y = `2020-04-01`, color = Top10New, label = ifelse(stringr::str_detect(entity_name, "other|unspec") | nchar(entity_name) > 25 | mean_monthly_pts < 4300 | entity_name %in% figS2excldxlist, "", entity_name), size = mean_monthly_pts)) + geom_point(alpha = 0.4) + geom_text_repel(max.overlaps = Inf, size = 3, segment.alpha = 0.3, min.segment.length = 0, force_pull = 3.5, force = 4.5, box.padding = 0.3) + geom_vline(xintercept = 0) + geom_hline(yintercept = 0) + geom_abline(intercept = 0, slope = 1, color="grey", linetype="dashed") + scale_size_area() + labs(title = "Deviations over time for retinal and vitreous conditions (besides DR and AMD)", y = "Deviation from Expectation, Apr '20", x = "Deviation from Expectation, Jun '20 - Dec '21", color = "Diagnosis subcategory", size = "Average monthly volume") + guides(color = guide_legend(override.aes = aes(label = ""), order = 1)) + theme_bw() + annotate("text", x=-0.35, y=-0.05, label="r = 0.395", size = 3.25, col = 'blue')
+
+dev.off()
+```
+
+### FIGURE S3: Corneal diseases
+```{r}
+corneal_dx_list <- pull(master_summarystats[master_summarystats$Category == 'Cornea and external disease', 'entity_name'])
+corneal_dx_list <- corneal_dx_list[corneal_dx_list %in% accurate_dx_list] 
+
+corneal_sp_df <- master_summarystats[master_summarystats$entity_name %in% corneal_dx_list, ]
+
+corneal_top10_crosswalk <- unique(icd_df[icd_df$Category == "Cornea and external disease", c('Top10','Diagnosis.Name')]) ##76 rows
+corneal_top10_crosswalk$Top10 <- ifelse(corneal_top10_crosswalk$Diagnosis.Name == "conjunctivitis - infectious", "Conjunctivitis", corneal_top10_crosswalk$Top10)
+corneal_top10_crosswalk$Top10 <- ifelse(corneal_top10_crosswalk$Diagnosis.Name == "episcleritis", "Scleritis and episcleritis", corneal_top10_crosswalk$Top10)
+corneal_top10_crosswalk$Top10 <- ifelse(corneal_top10_crosswalk$Diagnosis.Name == "eyelid dermatoses - noninfectious", "Other inflammations of eyelids", corneal_top10_crosswalk$Top10)
+corneal_top10_crosswalk$Top10 <- ifelse(corneal_top10_crosswalk$Diagnosis.Name == "keratitis - infectious", "Other forms of keratitis", corneal_top10_crosswalk$Top10)
+corneal_top10_crosswalk$Top10 <- ifelse(corneal_top10_crosswalk$Diagnosis.Name == "other conjunctival disorders", "Other disorders of conjunctiva", corneal_top10_crosswalk$Top10)
+corneal_top10_crosswalk <- unique(corneal_top10_crosswalk)
+
+corneal_sp_df <- merge(corneal_sp_df, corneal_top10_crosswalk, by.x = "entity_name", by.y = "Diagnosis.Name")
+
+corneal_sp_df$Top10New <- ifelse(corneal_sp_df$Top10 == "Keratoconjunctivitis", "Conjunctivitis", corneal_sp_df$Top10)
+corneal_sp_df$Top10New <- ifelse(corneal_sp_df$Top10New == "Conjunctival vascular disorders and cysts" | corneal_sp_df$Top10New == "Conjunctival degenerations and deposits" | corneal_sp_df$Top10New == "Conjunctival scars" | corneal_sp_df$Top10New == "Other disorders of conjunctiva", "Other conjunctival disorders", corneal_sp_df$Top10New)
+corneal_sp_df$Top10New <- ifelse(corneal_sp_df$Top10New == "Interstitial and deep keratitis" | corneal_sp_df$Top10New == "Other forms of keratitis" | corneal_sp_df$Top10New == "Superficial keratitis without conjunctivitis", "Keratitis", corneal_sp_df$Top10New)
+
+corneal_sp_df$Top10New <- ifelse(corneal_sp_df$Top10New != "Corneal degenerations" & corneal_sp_df$Top10New != "Conjunctivitis" & corneal_sp_df$Top10New != "Complication of corneal transplant" & corneal_sp_df$Top10New != "Foreign body on external eye" & corneal_sp_df$Top10New != "Other conjunctival disorders" & corneal_sp_df$Top10New != "Corneal scars and opacities" & corneal_sp_df$Top10New != "Corneal Ulcer" & corneal_sp_df$Top10New != "Scleritis and episcleritis" & corneal_sp_df$Top10New != "Keratitis", "Other corneal disorders", corneal_sp_df$Top10New)
+
+figS3excldxlist <- c("trichiasis w/o entropion", "corneal degen - arcus senilis", "keratoconus")
+```
+
+```{r}
+cor.test(corneal_sp_df[, 'meanAllpost'], corneal_sp_df[, '2020-04-01'])
+```
+
+```{r, fig.width=5, fig.height=2.25}
+pdf(file="suppl-figs-tables/figure-s3.pdf", width = 9.25, height = 4.25, onefile = FALSE)
+
+ggplot(corneal_sp_df, aes(x = meanAllpost, y = `2020-04-01`, color = Top10New, label = ifelse(stringr::str_detect(entity_name, "other|unspec") | nchar(entity_name) > 30 | mean_monthly_pts < 4300 | entity_name %in% figS3excldxlist, "", entity_name), size = mean_monthly_pts)) + geom_point(alpha = 0.4) + geom_text_repel(max.overlaps = Inf, size = 3, box.padding = 0.5, force_pull = 0, segment.alpha = 0.3, min.segment.length = 0) + geom_vline(xintercept = 0) + geom_hline(yintercept = 0) + geom_abline(intercept = 0, slope = 1, color="grey", linetype="dashed") + scale_size_area() + labs(title = "Deviations over time for corneal and external conditions", y = "Deviation from Expectation, Apr '20", x = "Deviation from Expectation, Jun '20 - Dec '21", color = "Diagnosis subcategory", size = "Average monthly volume") + guides(color = guide_legend(override.aes = aes(label = ""), order = 1)) + scale_y_continuous(expand = expansion(mult = 0.5)) + theme_bw() + annotate("text", x=-0.35, y=0.05, label="r = 0.186", size = 3.25, col = 'blue')
+
+dev.off()
+```
+
+### FIGURE S4: Oculoplastics diseases
+```{r}
+oculoplast_dx_list <- pull(master_summarystats[master_summarystats$Category == 'Oculoplastics and orbital conditions', 'entity_name'])
+oculoplast_dx_list <- oculoplast_dx_list[oculoplast_dx_list %in% accurate_dx_list] 
+
+oculoplast_sp_df <- master_summarystats[master_summarystats$entity_name %in% oculoplast_dx_list, ]
+
+oculoplast_top10_crosswalk <- unique(icd_df[icd_df$Category == "Oculofacial plastics and orbital conditions", c('Top10','Diagnosis.Name')]) ##53 rows
+oculoplast_top10_crosswalk$Top10 <- ifelse(oculoplast_top10_crosswalk$Diagnosis.Name == "eyelid/periocular superficial injury", "Superficial injury of eye and adnexa", oculoplast_top10_crosswalk$Top10)
+oculoplast_top10_crosswalk <- unique(oculoplast_top10_crosswalk)
+
+oculoplast_sp_df <- merge(oculoplast_sp_df, oculoplast_top10_crosswalk, by.x = "entity_name", by.y = "Diagnosis.Name")
+
+oculoplast_sp_df$Top10New <- ifelse(oculoplast_sp_df$Top10 == "Benign neoplasm of eye and adnexa", "Benign neoplasm", oculoplast_sp_df$Top10)
+oculoplast_sp_df$Top10New <- ifelse(oculoplast_sp_df$Top10New == "Malignant neoplasm of eye and adnexa", "Malignant neoplasm", oculoplast_sp_df$Top10New)
+oculoplast_sp_df$Top10New <- ifelse(oculoplast_sp_df$Top10New == "Degenerative disorders of eyelid and periocular area", "Degenerative disorders", oculoplast_sp_df$Top10New)
+oculoplast_sp_df$Top10New <- ifelse(oculoplast_sp_df$Top10New == "Acute and unspecified inflammation of lacrimal passages" | oculoplast_sp_df$Top10New == "Acute inflammation of orbit" | oculoplast_sp_df$Top10New == "Chronic inflammation of lacrimal passages" | oculoplast_sp_df$Top10New == "Chronic inflammatory disorders of orbit", "Inflammatory conditions", oculoplast_sp_df$Top10New)
+oculoplast_sp_df$Top10New <- ifelse(oculoplast_sp_df$Top10New == "Contusion of eye and adnexa" | oculoplast_sp_df$Top10New == "Other injuries of the eye and adnexa" | oculoplast_sp_df$Top10New == "Superficial injury of eye and adnexa", "Injuries of eye and adnexa", oculoplast_sp_df$Top10New)
+
+oculoplast_sp_df$Top10New <- ifelse(oculoplast_sp_df$Top10New != "Benign neoplasm" & oculoplast_sp_df$Top10New != "Malignant neoplasm" & oculoplast_sp_df$Top10New != "Degenerative disorders" & oculoplast_sp_df$Top10New != "Inflammatory conditions" & oculoplast_sp_df$Top10New != "Injuries of eye and adnexa", "Other disorders", oculoplast_sp_df$Top10New)
+
+figS4excldxlist <- c('lacrimal passage stenosis/insufficiency', 'lacrimal passage infl - chronic', 'eyelid retraction', 'eyelid edema')
+```
+
+```{r}
+cor.test(oculoplast_sp_df[, 'meanAllpost'], oculoplast_sp_df[, '2020-04-01'])
+```
+
+```{r, fig.width=5, fig.height=2.25}
+pdf(file="suppl-figs-tables/figure-s4.pdf", width = 9.25, height = 4.25, onefile = FALSE)
+
+ggplot(oculoplast_sp_df, aes(x = meanAllpost, y = `2020-04-01`, color = Top10New, label = ifelse(stringr::str_detect(entity_name, "other|unspec") | entity_name %in% figS4excldxlist, "", entity_name), size = mean_monthly_pts)) + geom_point(alpha = 0.4) + geom_text_repel(max.overlaps = Inf, size = 3, box.padding = 0.4, force_pull = 0, segment.alpha = 0.3, min.segment.length = 0) + geom_vline(xintercept = 0) + geom_hline(yintercept = 0) + geom_abline(intercept = 0, slope = 1, color="grey", linetype="dashed") + scale_size_area() + labs(title = "Deviations over time for oculofacial plastics and orbital conditions", y = "Deviation from Expectation, Apr '20", x = "Deviation from Expectation, Jun '20 - Dec '21", color = "Diagnosis subcategory", size = "Average monthly volume") + guides(color = guide_legend(override.aes = aes(label = ""), order = 1)) + theme_bw() + annotate("text", x=-0.4, y=-0.05, label="r = 0.012", size = 3.25, col = 'blue')
+
+dev.off()
+```
+
+### FIGURE S5: Uveitis/infl diseases
+```{r}
+uveitis_dx_list <- pull(master_summarystats[master_summarystats$Category == 'Uveitis and ocular inflammation', 'entity_name'])
+uveitis_dx_list <- uveitis_dx_list[uveitis_dx_list %in% accurate_dx_list] ##14 conditions
+
+uveitis_sp_df <- master_summarystats[master_summarystats$entity_name %in% uveitis_dx_list, ]
+
+uveitis_top10_crosswalk <- unique(icd_df[icd_df$Category == "Uveitis and ocular inflammation", c('Top10','Diagnosis.Name')]) ##25 rows
+uveitis_top10_crosswalk$Top10 <- ifelse(stringr::str_detect(uveitis_top10_crosswalk$Diagnosis.Name, "anterior uveitis"), "Anterior uveitis", uveitis_top10_crosswalk$Top10)
+uveitis_top10_crosswalk$Top10 <- ifelse(stringr::str_detect(uveitis_top10_crosswalk$Diagnosis.Name, "posterior uveitis"), "Posterior uveitis", uveitis_top10_crosswalk$Top10)
+uveitis_top10_crosswalk$Top10 <- ifelse(stringr::str_detect(uveitis_top10_crosswalk$Diagnosis.Name, "secondary uveitis"), "Secondary uveitis", uveitis_top10_crosswalk$Top10)
+uveitis_top10_crosswalk <- unique(uveitis_top10_crosswalk) ##19 rows
+
+uveitis_sp_df <- merge(uveitis_sp_df, uveitis_top10_crosswalk, by.x = "entity_name", by.y = "Diagnosis.Name")
+
+uveitis_sp_df$Top10New <- ifelse(uveitis_sp_df$Top10 == "Herpesviral ocular disease" | uveitis_sp_df$Top10 == "Toxoplasma oculopathy", "Other condition", uveitis_sp_df$Top10)
+
+figS5excldxlist <- c('herpesviral ocular disease', 'toxoplasma oculopathy')
+```
+
+```{r}
+cor.test(uveitis_sp_df[, 'meanAllpost'], uveitis_sp_df[, '2020-04-01'])
+```
+
+```{r, fig.width=5, fig.height=2}
+pdf(file="suppl-figs-tables/figure-s5.pdf", width = 9.25, height = 4.25, onefile = FALSE)
+
+ggplot(uveitis_sp_df, aes(x = meanAllpost, y = `2020-04-01`, color = Top10New, label = ifelse(entity_name %in% figS5excldxlist, "", entity_name), size = mean_monthly_pts)) + geom_point(alpha = 0.4) + geom_text_repel(max.overlaps = Inf, size = 3, box.padding = 0.5, force_pull = 0, segment.alpha = 0.3, min.segment.length = 0) + geom_vline(xintercept = 0) + geom_hline(yintercept = 0) + geom_abline(intercept = 0, slope = 1, color="grey", linetype="dashed") + scale_size_area() + labs(title = "Deviations over time for uveitis and ocular inflammation", y = "Deviation from Expectation, Apr '20", x = "Deviation from Expectation, Jun '20 - Dec '21", color = "Diagnosis subcategory", size = "Average monthly volume") + guides(color = guide_legend(override.aes = aes(label = ""), order = 1)) + theme_bw() + annotate("text", x=-0.3, y=-0.05, label="r = -0.421", size = 3.25, col = 'blue')
+
+dev.off()
+```
+
+### FIGURE S6: Blindness / vision defect diseases
+```{r}
+blindvdf_dx_list <- pull(master_summarystats[master_summarystats$Category == 'Blindness and vision defects', 'entity_name'])
+blindvdf_dx_list <- blindvdf_dx_list[blindvdf_dx_list %in% accurate_dx_list] ##14 conditions
+
+blindvdf_sp_df <- master_summarystats[master_summarystats$entity_name %in% blindvdf_dx_list, ]
+
+blindvdf_top10_crosswalk <- unique(icd_df[icd_df$Category == "Blindness and vision defects", c('Top10','Diagnosis.Name')]) ##25 rows
+
+blindvdf_sp_df <- merge(blindvdf_sp_df, blindvdf_top10_crosswalk, by.x = "entity_name", by.y = "Diagnosis.Name")
+
+blindvdf_sp_df$Top10New <- ifelse(!(blindvdf_sp_df$Top10 %in% c("Amblyopia ex anopsia", "Subjective visual disturbances")), "Other visual defect", blindvdf_sp_df$Top10)
+
+figS6excldxlist <- c('other binocular vision disorders')
+```
+
+```{r}
+cor.test(blindvdf_sp_df[, 'meanAllpost'], blindvdf_sp_df[, '2020-04-01'])
+```
+
+```{r, fig.width=5, fig.height=2}
+pdf(file="suppl-figs-tables/figure-s6.pdf", width = 9.25, height = 4.25, onefile = FALSE)
+
+ggplot(blindvdf_sp_df, aes(x = meanAllpost, y = `2020-04-01`, color = Top10New, label = ifelse(entity_name %in% figS6excldxlist, "", entity_name), size = mean_monthly_pts)) + geom_point(alpha = 0.4) + geom_text_repel(max.overlaps = Inf, size = 3, box.padding = 0.5, force_pull = 0, segment.alpha = 0.3, min.segment.length = 0) + geom_vline(xintercept = 0) + geom_hline(yintercept = 0) + geom_abline(intercept = 0, slope = 1, color="grey", linetype="dashed") + scale_size_area() + labs(title = "Deviations over time for blindness and vision defects", y = "Deviation from Expectation, Apr '20", x = "Deviation from Expectation, Jun '20 - Dec '21", color = "Diagnosis subcategory", size = "Average monthly volume") + guides(color = guide_legend(override.aes = aes(label = ""), order = 1)) + theme_bw() + annotate("text", x=-0.4, y=-0.05, label="r = 0.375", size = 3.25, col = 'blue')
+
+dev.off()
+```
+
+## FIGURE S7: Master heatmap of all deviances 
+
+Dataframes to use:
+`master_devs`: dataframe of deviance point estimates, with non-sigs as zero
+`master_devsOrig`: dataframe of deviance point estimates, with retention of the actual values of non-sigs
+`master_dev_bounds`: dataframe of 95% CIs for the deviances
+`master_pvalues`: dataframe of p-values for the deviances
+`master_summarystats`: dataframe of summary stats for the aggregate periods (Q3 2020 to Q4 2021, and all post-hiatus months)
+
+```{r}
+colnames(master_devs) <- c("Jan 2020", "Feb 2020", "Mar 2020", "Apr 2020", "May 2020", "Jun 2020", "Jul 2020", "Aug 2020", "Sep 2020", "Oct 2020", "Nov 2020", "Dec 2020", "Jan 2021", "Feb 2021", "Mar 2021", "Apr 2021", "May 2021", "Jun 2021", "Jul 2021", "Aug 2021", "Sep 2021", "Oct 2021", "Nov 2021", "Dec 2021")
+```
+
+```{r}
+col_fun_wtd = colorRamp2(c(-4, 0, 4), c("#de425b", "#eeeeee", "#21a6db"))
+col_fun_wtd(seq(-3, 3))
+```
+
+```{r}
+#remove the 'entity_name' column
+master_devsOrig <- master_devsOrig[, -25] 
+master_devsWeighted <- master_devsWeighted[, -25]
+```
+
+```{r, fig.asp = 3}
+pdf(file="suppl-figs-tables/figure-s7.pdf", width = 12, height = 36)
+
+#draw the heatmap
+masterhm <- Heatmap(as.matrix(master_devsWeighted), 
+                    row_split = icd_df2$catCode,
+                    row_title_rot = 0,
+                    row_title_gp = gpar(fontsize = 14, fontface = "bold"),
+                    row_names_gp = grid::gpar(fontsize = 8),
+                    column_names_gp = grid::gpar(fontsize = 8),
+                    row_gap = unit(2, "mm"),
+                    column_names_rot = 90,
+                    cluster_row_slices = FALSE, 
+                    cluster_columns = F, 
+                    col = col_fun_wtd, 
+                    rect_gp = gpar(col = "dark grey", lwd = 2),
+                    heatmap_legend_param = list(title = "", title_gp = gpar(fontsize = 8, fontface = 'bold'), direction = "horizontal", labels = c(expression(-delta*"*"), "", "", "", expression(+delta*"*"))),
+                    cell_fun = function(j, i, x, y, width, height, fill) {
+                    grid.text(format(as.numeric(sprintf("%.2f", master_devsOrig[i, j])), nsmall = 2), x, y, gp = gpar(fontsize = 8))}
+                    )
+
+ComplexHeatmap::draw(masterhm, heatmap_legend_side = "top") 
+
+dev.off()
+```
+
+## TABLE S5: Select conditions post-hiatus
+
+First, produce a "weighted" version of meanAllpost.
+```{r}
+master_summarystats$Allpost <- master_summarystats$meanAllpost * -log(master_summarystats$pvalEmpricialAllpost)
+```
+
+Then, set a custom color scale for the following diagnosis categories:
+
+1. Blind
+2. Cataract
+3. Cornea/External
+4. Glaucoma
+5. Neuro
+6. Oculoplastics
+7. OGI
+8. Other
+9. PO
+(Only category that doens't appear in Tables S1-S2 is "Refra". Might as well include it then - as grey?)
+10. Retina/Vitreous
+11. Strab
+12. Uveitis
+
+
+```{r}
+sTables_colors <- c('#a6cee3', '#1f78b4', '#b2df8a', '#33a02c', '#fb9a99', '#e31a1c', '#fdbf6f', '#ff7f00', '#cab2d6', 'grey', '#6a3d9a', '#ffff99', '#b15928')
+names(sTables_colors) <- sort(unique(master_summarystats$short_name))
+#sTables_colorscale <- scale_fill_manual(name = "Diagnosis Category", values = sTables_colors)
+```
+
+#### S5A: Suppression post-hiatus
+
+Conditions that have the most suppressed post-hiatus utilization (mean deviation ≤ 20%).
+```{r}
+#first subset all conditions with a post-hiatus deviation < 0 with statistical significance
+dfNR <- master_summarystats[master_summarystats$Allpost < 0 & master_summarystats$pvalEmpricialAllpost < 0.05, c("entity_name", "short_name", "meanAllpost", "confintAllpost", "pvalEmpricialAllpost", "Allpost", "recoveredMonth", "fullRecovery", "RMSPE")]
+
+#only include all conditions with a post-hiatus deviation <= -0.20
+dfNR_final <- dfNR[(dfNR$meanAllpost <= -0.20), ]
+dfNR_final$meanAllpost <- sprintf("%.3f", round(dfNR_final$meanAllpost, 3))
+dfNR_final$RMSPE <- sprintf("%.3f", round(dfNR_final$RMSPE, 3))
+dfNR_final$recoveredMonthNum <- ifelse(dfNR_final$recoveredMonth == 'No recovery', dfNR_final$recoveredMonth, format(my('Jan 2020') + (months(as.numeric(dfNR_final$recoveredMonth))-1), format = '%b %Y'))
+dfNR_final$recoveryType <- case_when(
+  dfNR_final$recoveredMonth == 'No recovery' ~ 'N/A',
+  dfNR_final$recoveredMonth != 'No recovery' & dfNR_final$fullRecovery == TRUE ~ 'Full',
+  TRUE ~ 'Partial'
+)
+```
+
+```{r}
+dfNR_final <- dfNR_final %>%
+  arrange(meanAllpost) %>%
+  mutate(xnum = 1,
+         x_width = 1.85,
+         y_delta = 0.5,
+         ynum = 1:n(),
+         x_min = xnum - x_width/2,
+         x_max = xnum + x_width/2,
+         y_min = ynum - y_delta,
+         y_max = ynum + y_delta,
+         x_position = x_min + 0.005,
+         pval = ifelse(pvalEmpricialAllpost < 0.001, '< 0.001', pvalEmpricialAllpost)) 
+
+tblS5A <- ggplot(data = dfNR_final) +
+  geom_rect(aes(xmin = x_min, xmax = x_max, ymin = y_min, ymax = y_max,
+                fill = short_name), alpha = 0.5,
+            color = 'white', size = 0.01) +
+  geom_text(aes(x = x_position, y = ynum, label = entity_name),
+            hjust = 0, size = 2) +
+  geom_text(aes(x = 0.8, y = ynum, label = meanAllpost),
+            hjust = 0, size = 2) +
+  geom_text(aes(x = 1.10, y = ynum, label = confintAllpost), size = 2) +
+  geom_text(aes(x = 1.30, y = ynum, label = pval), size = 2) +
+  geom_text(aes(x = 1.475, y = ynum, label = recoveredMonthNum), size = 2) +
+  geom_text(aes(x = 1.695, y = ynum, label = recoveryType), size = 2) +
+  geom_text(aes(x = 1.85, y = ynum, label = RMSPE), size = 2) +
+  geom_rect(xmin = unique(dfNR_final$x_min), xmax = unique(dfNR_final$x_max), ymin = max(dfNR_final$y_max), ymax = max(dfNR_final$y_max) + 1, fill = 'white', col = 'black') + 
+  annotate("text", x = unique(dfNR_final$x_position), y = max(dfNR_final$ynum) + 1, label = 'Entity Name', hjust = 0, size = 2, fontface = 'bold') +
+  annotate("text", x = 0.825, y = max(dfNR_final$ynum) + 1, label = 'Post-hiatus Mean Deviation', size = 2, fontface = 'bold') +
+  annotate("text", x = 1.10, y = max(dfNR_final$ynum) + 1, label = '95% CI', size = 2, fontface = 'bold') +
+  annotate("text", x = 1.30, y = max(dfNR_final$ynum) + 1, label = 'p-value', size = 2, fontface = 'bold') +
+  annotate("text", x = 1.475, y = max(dfNR_final$ynum) + 1, label = 'Recovery Month', size = 2, fontface = 'bold') +
+  annotate("text", x = 1.695, y = max(dfNR_final$ynum) + 1, label = 'Recovery Type', size = 2, fontface = 'bold') +
+  annotate("text", x = 1.85, y = max(dfNR_final$ynum) + 1, label = 'RMSPE', size = 2, fontface = 'bold') +
+  theme_void() +
+  scale_fill_manual(name = "Diagnosis Category", values = sTables_colors, limits = force)
+
+tblS5A
+```
+
+#### S5B: Met or exceeded expectation post-hiatus
+Conditions that met or exceed counterfactual expectation in the post-hiatus period (mean deviation > 0%, with no restriction on statistical significance) 
+```{r}
+dfAE <- master_summarystats[master_summarystats$meanAllpost > 0,  c("entity_name", "short_name", "meanAllpost", "confintAllpost", "pvalEmpricialAllpost", "Allpost", "recoveredMonth", "fullRecovery", "RMSPE")]
+
+dfAE$meanAllpost <- sprintf("%.3f", round(dfAE$meanAllpost, 3))
+dfAE$RMSPE <- sprintf("%.3f", round(dfAE$RMSPE, 3))
+dfAE$recoveredMonthNum <- ifelse(dfAE$recoveredMonth == 'No recovery', dfAE$recoveredMonth, format(my('Jan 2020') + (months(as.numeric(dfAE$recoveredMonth))-1), format = '%b %Y'))
+dfAE$recoveryType <- case_when(
+  dfAE$recoveredMonth == 'No recovery' ~ 'N/A',
+  dfAE$recoveredMonth != 'No recovery' & dfAE$fullRecovery == TRUE ~ 'Full',
+  TRUE ~ 'Partial'
+)
+```
+
+```{r}
+dfAE <- dfAE %>%
+  arrange(meanAllpost) %>%
+  mutate(xnum = 1,
+         x_width = 1.85,
+         y_delta = 0.5,
+         ynum = 1:n(),
+         x_min = xnum - x_width/2,
+         x_max = xnum + x_width/2,
+         y_min = ynum - y_delta,
+         y_max = ynum + y_delta,
+         x_position = x_min + 0.005,
+         pval = ifelse(pvalEmpricialAllpost < 0.001, '< 0.001', pvalEmpricialAllpost)) 
+
+tblS5B <- ggplot(data = dfAE) +
+  geom_rect(aes(xmin = x_min, xmax = x_max, ymin = y_min, ymax = y_max,
+                fill = short_name), alpha = 0.5,
+            color = 'white', size = 0.01) +
+  geom_text(aes(x = x_position, y = ynum, label = entity_name),
+            hjust = 0, size = 2) +
+  geom_text(aes(x = 0.8, y = ynum, label = meanAllpost),
+            hjust = 0, size = 2) +
+  geom_text(aes(x = 1.10, y = ynum, label = confintAllpost), size = 2) +
+  geom_text(aes(x = 1.30, y = ynum, label = pval), size = 2) +
+  geom_text(aes(x = 1.475, y = ynum, label = recoveredMonthNum), size = 2) +
+  geom_text(aes(x = 1.695, y = ynum, label = recoveryType), size = 2) +
+  geom_text(aes(x = 1.85, y = ynum, label = RMSPE), size = 2) +
+  geom_rect(xmin = unique(dfAE$x_min), xmax = unique(dfAE$x_max), ymin = max(dfAE$y_max), ymax = max(dfAE$y_max) + 1, fill = 'white', col = 'black') + 
+  annotate("text", x = unique(dfAE$x_position), y = max(dfAE$ynum) + 1, label = 'Entity Name', hjust = 0, size = 2, fontface = 'bold') +
+  annotate("text", x = 0.825, y = max(dfAE$ynum) + 1, label = 'Post-hiatus Mean Deviation', size = 2, fontface = 'bold') +
+  annotate("text", x = 1.10, y = max(dfAE$ynum) + 1, label = '95% CI', size = 2, fontface = 'bold') +
+  annotate("text", x = 1.30, y = max(dfAE$ynum) + 1, label = 'p-value', size = 2, fontface = 'bold') +
+  annotate("text", x = 1.475, y = max(dfAE$ynum) + 1, label = 'Recovery Month', size = 2, fontface = 'bold') +
+  annotate("text", x = 1.695, y = max(dfAE$ynum) + 1, label = 'Recovery Type', size = 2, fontface = 'bold') +
+  annotate("text", x = 1.85, y = max(dfAE$ynum) + 1, label = 'RMSPE', size = 2, fontface = 'bold') +
+  theme_void() +
+  scale_fill_manual(name = "Diagnosis Category", values = sTables_colors, limits = force)
+
+tblS5B
+```
+
+```{r}
+#to create a common legend, generate a dummy ggplot containing the dx entities in both tblS5A and tblS5B
+
+dfS1X <- rbind(dfNR_final, dfAE)
+figS1X <- ggplot(dfS1X) + geom_raster(aes(x = meanAllpost, y = RMSPE, fill = short_name), alpha = 0.5) + scale_fill_manual(name = "Diagnosis Category", values = sTables_colors, limits = force) + theme(legend.title = element_text(size = 9, face = 'bold'), legend.text = element_text(size = 7.5))
+figS1X
+```
+
+```{r}
+pdf(file="suppl-figs-tables/table-s5.pdf", width = 9, height = 8, onefile = FALSE)
+
+ggarrange(tblS5A, tblS5B, ncol = 1, nrow = 2, labels = c("A", "B"), heights = c(0.65, 0.35), legend = "right", legend.grob = get_legend(figS1X))
+
+dev.off()
+```
+
+## TABLE S6: Rebounded conditions
+Conditions that exhibited any type of recovery (full or partial): 
+
+```{r}
+dfAR <- master_summarystats[master_summarystats$recoveredMonth != 'No recovery',  c("entity_name", "short_name", "meanAllpost", "confintAllpost", "pvalEmpricialAllpost", "Allpost", "recoveredMonth", "fullRecovery", "RMSPE")]
+
+dfAR$meanAllpost <- sprintf("%.3f", round(dfAR$meanAllpost, 3))
+dfAR$RMSPE <- sprintf("%.3f", round(dfAR$RMSPE, 3))
+dfAR$recoveredMonthNum <- ifelse(dfAR$recoveredMonth == 'No recovery', dfAR$recoveredMonth, format(my('Jan 2020') + (months(as.numeric(dfAR$recoveredMonth))-1), format = '%b %Y'))
+dfAR$recoveryType <- case_when(
+  dfAR$recoveredMonth == 'No recovery' ~ 'N/A',
+  dfAR$recoveredMonth != 'No recovery' & dfAR$fullRecovery == TRUE ~ 'Full',
+  TRUE ~ 'Partial'
+)
+
+dfAR <- dfAR %>%
+  arrange(meanAllpost) %>%
+  mutate(xnum = 1,
+         x_width = 1.85,
+         y_delta = 0.5,
+         ynum = 1:n(),
+         x_min = xnum - x_width/2,
+         x_max = xnum + x_width/2,
+         y_min = ynum - y_delta,
+         y_max = ynum + y_delta,
+         x_position = x_min + 0.005,
+         pval = ifelse(pvalEmpricialAllpost < 0.001, '< 0.001', pvalEmpricialAllpost)) 
+```
+
+```{r}
+tblS6 <- ggplot(data = dfAR) +
+  geom_rect(aes(xmin = x_min, xmax = x_max, ymin = y_min, ymax = y_max,
+                fill = short_name), alpha = 0.5,
+            color = 'white', size = 0.01) +
+  geom_text(aes(x = x_position, y = ynum, label = entity_name),
+            hjust = 0, size = 2) +
+  geom_text(aes(x = 0.8, y = ynum, label = meanAllpost),
+            hjust = 0, size = 2) +
+  geom_text(aes(x = 1.10, y = ynum, label = confintAllpost), size = 2) +
+  geom_text(aes(x = 1.30, y = ynum, label = pval), size = 2) +
+  geom_text(aes(x = 1.475, y = ynum, label = recoveredMonthNum), size = 2) +
+  geom_text(aes(x = 1.695, y = ynum, label = recoveryType), size = 2) +
+  geom_text(aes(x = 1.85, y = ynum, label = RMSPE), size = 2) +
+  geom_rect(xmin = unique(dfAR$x_min), xmax = unique(dfAR$x_max), ymin = max(dfAR$y_max), ymax = max(dfAR$y_max) + 1, fill = 'white', col = 'black') + 
+  annotate("text", x = unique(dfAR$x_position), y = max(dfAR$ynum) + 1, label = 'Entity Name', hjust = 0, size = 2, fontface = 'bold') +
+  annotate("text", x = 0.825, y = max(dfAR$ynum) + 1, label = 'Post-hiatus Mean Deviation', size = 2, fontface = 'bold') +
+  annotate("text", x = 1.10, y = max(dfAR$ynum) + 1, label = '95% CI', size = 2, fontface = 'bold') +
+  annotate("text", x = 1.30, y = max(dfAR$ynum) + 1, label = 'p-value', size = 2, fontface = 'bold') +
+  annotate("text", x = 1.475, y = max(dfAR$ynum) + 1, label = 'Recovery Month', size = 2, fontface = 'bold') +
+  annotate("text", x = 1.695, y = max(dfAR$ynum) + 1, label = 'Recovery Type', size = 2, fontface = 'bold') +
+  annotate("text", x = 1.85, y = max(dfAR$ynum) + 1, label = 'RMSPE', size = 2, fontface = 'bold') +
+  theme_void() +
+  scale_fill_manual(name = "Diagnosis Category", values = sTables_colors, limits = force) +
+  theme(legend.title = element_text(size = 9, face = 'bold'), legend.text = element_text(size = 7.5))
+
+tblS6
+```
+
+```{r}
+pdf(file="suppl-figs-tables/table-s6.pdf", width = 8, height = 12, onefile = FALSE)
+
+ggdraw(tblS6)
+
+dev.off()
+```
+
+# Additional analyses of TTR
+Deeper explorations of the time-to-recovery secondary outcome
+Dataframes to use:
+- `dfNR_final` (Table S5A): dx entities with the most suppressed post-hiatus utilization (mean deviation ≤ 20%, with p ≤ 0.05)
+- `dfAE` (Table S5A): dx entities that met or exceeded counterfactual expectation in the post-hiatus period (mean deviation > 0%, with no restriction on statistical significance) 
+- `dfAR` (Table S6): dx entities that exhibited any type of recovery (full or partial)
+
+```{r}
+nrow(dfNR_final) #33
+nrow(dfAE) #15
+nrow(dfAR) #116
+```
+
+## Diagnosis categories represented in Table S5A
+```{r}
+sort(table(dfNR_final$short_name), decreasing = T)
+```
+> Most represented diagnosis categories among the conditions that experienced the most severe suppressions to care utilization included diagnoses related to corneal/external disease (12/33 = 36.4%), retina/vitreous (7/33 = 21.2%), oculoplastics (6/33 = 18.2%), and blindness and vision defects (4/33 = 12.1%). 
+
+> No conditions in Table S5A experienced any recovery, with the exception of the "eyelid/periocular superficial injury", which experienced only partial recovery in Nov 2020. 
+
+## Diagnosis categories represented in Table S5B
+```{r}
+sort(table(dfAE$short_name), decreasing = T)
+```
+> Most represented diagnosis categories among the conditions that experienced met or exceeded expectation included diagnoses related to retina/vitreous (7/15 = 46.7%) and corneal/external disease (3/15 = 20%).
+
+```{r}
+table(dfAE$recoveryType)
+table(dfAE$recoveredMonthNum)
+```
+> All conditions in Table S5B experienced full or partial recovery, with the majority experiencing full recovery (12/15 = 80%). Among these conditions, the most common month at which recovery was reached was June 2020 (i.e., time-to-recovery = 6 months since the start of the pandemic study period in Jan 2020).
+
+## Diagnosis categories represented in Table S6
+```{r}
+sort(table(dfAR$short_name), decreasing = T)
+```
+> Most represented diagnosis categories among the conditions in Table S6 included diagnoses related to retina/vitreous (28/116 = 24.1%), corneal/external disease (22/116 = 19.0%), oculoplastics (15/116 = 12.9%), and uveitis (12/116 = 10.3%).
+
+```{r}
+table(dfAR$recoveryType)
+sort(table(dfAR$recoveredMonthNum), decreasing = T)
+```
+> Among the 116 conditions that experienced any form of recovery, roughly half of these conditions (56.9%) only experienced partial recovery. 
+
+> The most common post-hiatus month at which conditions experienced recovery was June 2020 (42/116 = 36.2%), followed by September 2020 (17/116  = 14.7%), December 2020 (14/116 = 12.1%), June 2021 (14/116 = 12.1%), and February 2021 (13/116 = 11.2%).
+
+```{r}
+#considering adding this as a "Table S6B"?
+tbls6_summary <- as.data.frame(table(dfAR$short_name, dfAR$recoveryType))
+tbls6_summary <- reshape(tbls6_summary, idvar = "Var1", timevar = "Var2", direction = "wide")
+colnames(tbls6_summary) <- c("dx_category", "Full", "Partial")
+tbls6_summary$pct_fr <- tbls6_summary$Full/(tbls6_summary$Full+tbls6_summary$Partial)
+tbls6_summary$total <- tbls6_summary$Full+tbls6_summary$Partial
+tbls6_summary <- merge(tbls6_summary, table(master_summarystats$short_name), by.x = 'dx_category', by.y = 'Var1')
+colnames(tbls6_summary)[6] <- 'total_dx_entities'
+tbls6_summary$total_pct_rec <- tbls6_summary$total/tbls6_summary$total_dx_entities
+```
+
+> In terms of absolute numbers of conditions experiencing recovery, the highest were diagnoses of the retina/vitreous (28 recovered conditions; 12 full, 16 partial) and cornea/external diseases (22 recovered conditions; 6 full, 16 partial), followed by oculoplastics (15 recovered conditions; 8 full, 7 partial) and uveitis (12 recovered conditions; 5 full, 7 partial).
+
+> However, relative to the total number of conditions captured in each diagnosis category, the diagnosis categories with the highest proportions of recovered conditions were uveitis and ocular inflammation (12/15 = 80%), post-operative complications (4/5 = 80%), ocular globe injuries and intraocular foreign bodies (3/4 = 75%), and cataract and other lens disorders (5/7 = 71%). 
+
+> The diagnosis categories that exhibited the lowest proportions of recovery included the category of "other specified eye disorders" (2/13 = 15.4%), followed by refractive error (2/7 = 29%), retinal and vitreous conditions (28/75 = 37%), blindness and vision defects (5/13 = 38%), and cornea and external disease (22/56 = 39%). 
+
+> Nearly or precisely half of all conditions experienced recovery in the diagnosis categories of oculofacial plastics and orbital conditions (15/29 = 51.7%), neuro-ophthalmology (8/16 = 50%), strabismus (3/6 = 50%), glaucoma (7/15 = 47%).  
